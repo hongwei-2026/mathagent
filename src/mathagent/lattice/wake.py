@@ -31,6 +31,18 @@ def wake_attempt(
     emit = on_event or (lambda _m: None)
     emit(f"[lattice/wake] {node.id}: {node.statement[:120]}")
 
+    # Think pillar 1: concept-linked leaves must go through executable library when present
+    from mathagent.lattice.think.executable import wake_via_library
+
+    lib = wake_via_library(graph, node, on_event=emit)
+    if lib is not None:
+        if lib.ok:
+            return WakeOutcome(node.id, True, f"lib:{lib.method}", lib.detail)
+        # Library call failed — still try leaf sympy_hint below; record failure
+        detail = lib.detail
+    else:
+        detail = ""
+
     # Prefer Lean/econ if it looks formalizable
     leanish = "theorem" in node.statement or node.meta.get("lean_stub")
     if leanish and budget.can_call():
@@ -45,9 +57,7 @@ def wake_attempt(
             node.status = NodeStatus.CERTIFIED
             node.certificate = result.verdict
             return WakeOutcome(node.id, True, "econ", result.verdict, result.final_code)
-        detail = result.verdict
-    else:
-        detail = ""
+        detail = detail or result.verdict
 
     # SymPy / finite soft certificate — only with a real witness (no empty "proved")
     hint = str(node.meta.get("sympy_hint") or "").strip()

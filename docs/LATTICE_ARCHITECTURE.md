@@ -72,6 +72,14 @@ High `conceptual_value` without verified analogy maps stays `HUMAN_REVIEW`.
 | **Library sleep** | `lattice/sleep.py` | Sleep emits gated `library_ops` as Concepts — never high-score uncertified conjectures |
 | **Causal surprise** | `lattice/causal.py` | After wake, `do(concept)` → empirical leaf certify rate updates surprise |
 
+## Think layer (next paradigm)
+
+Executable library + hypothesis arena + evidence ledger: see [`THINK_ARCHITECTURE.md`](THINK_ARCHITECTURE.md).
+
+```bash
+mathagent lattice "..." --think --auto-accept
+```
+
 ## Admission rule (resource honesty)
 
 Only nodes with a **certificate** enter as `Lemma`:

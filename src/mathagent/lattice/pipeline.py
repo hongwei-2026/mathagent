@@ -31,6 +31,7 @@ from mathagent.lattice.curator import (
 from mathagent.lattice.graph import GraphStore, Node, NodeKind, NodeStatus, ResearchGraph
 from mathagent.lattice.mdl import graph_dl
 from mathagent.lattice.sleep import sleep_consolidate
+from mathagent.lattice.think.loop import run_think_cycle
 from mathagent.lattice.wake import WakeOutcome, wake_attempt
 
 
@@ -49,6 +50,7 @@ class LatticeResult:
     curator: dict[str, Any] = field(default_factory=dict)
     human_review_queue: list[str] = field(default_factory=list)
     causal: list[dict[str, Any]] = field(default_factory=list)
+    think: dict[str, Any] = field(default_factory=dict)
     graph_dl: float = 0.0
     verdict: str = ""
     graph_path: str = ""
@@ -72,6 +74,7 @@ class LatticePipeline:
         max_wake_nodes: int = 5,
         concept_value: bool = False,
         auto_accept_concepts: bool = False,
+        think: bool = False,
     ) -> None:
         self.settings = settings or get_settings()
         if not self.settings.api_key:
@@ -84,8 +87,9 @@ class LatticePipeline:
         self.budget = budget or Budget(max_tokens=16_000, max_llm_calls=20, max_direct_samples=2)
         self.wake_rounds = wake_rounds
         self.max_wake_nodes = max_wake_nodes
-        self.concept_value = concept_value
+        self.concept_value = concept_value or think
         self.auto_accept_concepts = auto_accept_concepts
+        self.think = think or concept_value  # concept-value implies think pillars
         self.store = GraphStore()
 
     def run(self, problem: str, project_id: str | None = None) -> LatticeResult:
@@ -150,6 +154,15 @@ class LatticePipeline:
             spawned = spawn_leaf_conjectures_from_concepts(graph)
             self.on_event(f"[lattice/curator] spawned {len(spawned)} concept-leaves")
 
+        think_summary: dict[str, Any] = {}
+        if self.think:
+            tr0 = run_think_cycle(graph, phase="start", on_event=self.on_event)
+            think_summary["start"] = {
+                "priors_boosted": tr0.priors_boosted,
+                "callable_ops": tr0.callable_ops,
+                "spawned_leaves": tr0.spawned_leaves,
+            }
+
         # --- Wake / Sleep rounds ---
         econ = EconEngine(
             settings=self.settings,
@@ -183,6 +196,9 @@ class LatticePipeline:
                         graph, node, econ=econ, budget=self.budget, on_event=self.on_event
                     )
                 )
+            if self.think:
+                tr_mid = run_think_cycle(graph, phase="mid", on_event=self.on_event)
+                think_summary.setdefault("arena_rounds", []).append(tr_mid.arena)
             sleep_data = sleep_consolidate(
                 graph,
                 client=self.client,
@@ -204,6 +220,12 @@ class LatticePipeline:
             causal_reports = apply_causal_surprise(graph)
             if causal_reports:
                 self.on_event(f"[lattice/causal] updated surprise on {len(causal_reports)} concepts")
+        if self.think:
+            tr_end = run_think_cycle(graph, phase="end", on_event=self.on_event)
+            think_summary["end"] = {
+                "evidence_records": tr_end.evidence_records,
+                "arena": tr_end.arena,
+            }
 
         path = self.store.save(graph)
         lemmas = [
@@ -262,9 +284,10 @@ class LatticePipeline:
             curator=report,
             human_review_queue=list(human_q),
             causal=causal_reports,
+            think=think_summary,
             graph_dl=graph_dl(graph),
             verdict=verdict,
             graph_path=str(path),
             budget=self.budget,
-            mode="concept_value" if self.concept_value else "classic",
+            mode="think" if self.think else ("concept_value" if self.concept_value else "classic"),
         )

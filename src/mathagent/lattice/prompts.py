@@ -47,14 +47,19 @@ Return STRICT JSON:
       "name": "short operator name",
       "statement": "what the definition/operator claims",
       "kind": "def|macro|sympy_template|lean_tactic",
-      "template": "optional sympy or lean snippet",
+      "template": "optional sympy snippet (use {{a}} holes)",
+      "artifact": {
+        "sympy_template": "({{a}}+{{b}})**2",
+        "sympy_expand": "{{a}}**2 + 2*{{a}}*{{b}} + {{b}}**2"
+      },
+      "instantiations": [{"binding": {"a": "x", "b": "y"}}],
       "why_transferable": "...",
       "from": ["source lemma ..."],
       "closes_gap_ids": [],
       "opens_gap_ids": [],
       "axiom_ask": [],
       "predicted_leaf_checks": [
-        {"statement": "cheap check that the op works", "certify_hint": "sympy", "sympy_hint": ""}
+        {"statement": "cheap check that the op works", "certify_hint": "sympy", "sympy_hint": "(x+y)**2 = x**2+2*x*y+y**2"}
       ]
     }
   ],

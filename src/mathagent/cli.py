@@ -168,6 +168,11 @@ def lattice(
     concept_value: bool = typer.Option(
         False, "--concept-value", help="A→E loop: abduction/concepts/analogy/curator/human-gate"
     ),
+    think: bool = typer.Option(
+        False,
+        "--think",
+        help="Think pillars: executable library + hypothesis arena + evidence ledger (implies concept-value)",
+    ),
     auto_accept: bool = typer.Option(
         False, "--auto-accept", help="Smoke only: auto-ACCEPT concepts (skips human co-abduction)"
     ),
@@ -179,6 +184,9 @@ def lattice(
     With --concept-value: abduction → Concept slots → analogy maps → curator rank →
     human gate queue → wake prefers concept-linked cheap leaves.
 
+    With --think: also run executable library calls, arena elimination, evidence ledger
+    (see docs/THINK_ARCHITECTURE.md).
+
     Does NOT claim Fields proofs. Builds certified lemmas + explicit gaps on a laptop budget.
     See docs/LATTICE_ARCHITECTURE.md.
     """
@@ -189,7 +197,8 @@ def lattice(
         budget=Budget(max_tokens=14000, max_llm_calls=18, max_direct_samples=2),
         wake_rounds=wake_rounds,
         max_wake_nodes=max_wake,
-        concept_value=concept_value,
+        concept_value=concept_value or think,
+        think=think or concept_value,
         auto_accept_concepts=auto_accept,
         on_event=console.print,
     )
@@ -203,7 +212,8 @@ def lattice(
             f"graph={result.graph_summary}\n"
             f"lemmas={len(result.certified_lemmas)} gaps={len(result.gaps)} "
             f"concepts={len(result.concepts)}\n"
-            f"graph_dl={result.graph_dl:.1f} causal={len(result.causal)}\n"
+            f"graph_dl={result.graph_dl:.1f} causal={len(result.causal)} "
+            f"think={bool(result.think)}\n"
             f"human_review={result.human_review_queue}\n"
             f"saved={result.graph_path}",
             title="MathLattice",
@@ -233,6 +243,7 @@ def lattice(
             "curator": result.curator,
             "human_review_queue": result.human_review_queue,
             "causal": result.causal,
+            "think": result.think,
             "graph_dl": result.graph_dl,
             "certified_lemmas": result.certified_lemmas,
             "gaps": result.gaps,

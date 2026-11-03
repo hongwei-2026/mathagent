@@ -64,10 +64,13 @@ def admit_library_op(graph: ResearchGraph, op: dict[str, Any]) -> Any | None:
     node.meta["origin"] = "sleep"
     node.meta["from_sleep"] = True
     node.meta["library_op"] = op
-    node.meta["artifact"] = op.get("artifact") or {
-        "template": op.get("template") or "",
-        "kind": op.get("kind") or "def",
-    }
+    art = dict(op.get("artifact") or {})
+    if op.get("template") and not art.get("sympy_template"):
+        art["sympy_template"] = op["template"]
+    art.setdefault("kind", op.get("kind") or "def")
+    if art.get("template") and not art.get("sympy_template"):
+        art["sympy_template"] = art["template"]
+    node.meta["artifact"] = art
     node.meta["from_lemmas"] = from_lemmas
     node.meta["predicted_leaf_checks"] = leaves
     node.meta["belief"] = prop["belief"]
