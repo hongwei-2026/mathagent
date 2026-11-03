@@ -160,6 +160,68 @@ def formal(
 
 
 @app.command()
+def lattice(
+    problem: str = typer.Argument(..., help="Research / Fields-adjacent problem statement"),
+    project: Optional[str] = typer.Option(None, help="Project id for graph persistence"),
+    wake_rounds: int = typer.Option(1, help="Wake/sleep cycles"),
+    max_wake: int = typer.Option(4, help="Max conjectures attempted per wake"),
+    out: Optional[Path] = typer.Option(None, help="Write JSON result"),
+) -> None:
+    """
+    MathLattice: conjecture pool → research graph → wake/sleep (Fields-oriented architecture).
+
+    Does NOT claim Fields proofs. Builds certified lemmas + explicit gaps on a laptop budget.
+    See docs/LATTICE_ARCHITECTURE.md.
+    """
+    from mathagent.formal.budget import Budget
+    from mathagent.lattice.pipeline import LatticePipeline
+
+    pipe = LatticePipeline(
+        budget=Budget(max_tokens=14000, max_llm_calls=18, max_direct_samples=2),
+        wake_rounds=wake_rounds,
+        max_wake_nodes=max_wake,
+        on_event=console.print,
+    )
+    result = pipe.run(problem, project_id=project)
+    console.print(
+        Panel(
+            f"verdict={result.verdict}\n"
+            f"difficulty={result.difficulty}\n"
+            f"insight={result.key_insight}\n"
+            f"graph={result.graph_summary}\n"
+            f"lemmas={len(result.certified_lemmas)} gaps={len(result.gaps)}\n"
+            f"saved={result.graph_path}",
+            title="MathLattice",
+            border_style="magenta",
+        )
+    )
+    if result.certified_lemmas:
+        console.print(Panel("\n".join(f"• {x}" for x in result.certified_lemmas[:8]), title="Certified"))
+    if result.gaps:
+        console.print(Panel("\n".join(f"• {x}" for x in result.gaps[:8]), title="Gaps (honest)"))
+    if out:
+        payload = {
+            "project_id": result.project_id,
+            "problem": result.problem,
+            "verdict": result.verdict,
+            "difficulty": result.difficulty,
+            "key_insight": result.key_insight,
+            "graph_summary": result.graph_summary,
+            "certified_lemmas": result.certified_lemmas,
+            "gaps": result.gaps,
+            "sleep": result.sleep,
+            "wake": [
+                {"node_id": w.node_id, "ok": w.ok, "method": w.method, "detail": w.detail[:500]}
+                for w in result.wake_outcomes
+            ],
+            "graph_path": result.graph_path,
+        }
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        console.print(f"Wrote {out}")
+
+
+@app.command()
 def econ(
     problem: str = typer.Argument(..., help="Lean theorem or informal hard goal"),
     max_tokens: int = typer.Option(12000, help="Soft token budget"),

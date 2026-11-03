@@ -42,6 +42,23 @@ User problem
 5. **Bundled samples + HF download** — start offline; scale to GSM8K/MATH when ready
 6. **CLI + Streamlit UI** — one package for scripted eval and interactive demos
 
+## MathLattice (Fields-oriented architecture)
+
+Contest provers ≠ research math. **MathLattice** adapts frontier research architectures
+(Ansatz graph memory, DreamProver wake/sleep, conjecture-first formalization) to this repo:
+
+```text
+conjecture pool → typed research graph → wake(econ/Lean/SymPy) → sleep(abstract lemmas)
+                                                      ↓
+                                              explicit Gap ledger
+```
+
+```bash
+mathagent lattice "Twin prime conjecture: map lemmas you can certify and mark the open gap" --out outputs/lattice.json
+```
+
+Design notes: [docs/LATTICE_ARCHITECTURE.md](docs/LATTICE_ARCHITECTURE.md)
+
 ## Low-cost doctrine (beat “many agents × huge compute”)
 
 OpenAI-style IMO runs burn proprietary RL + massive test-time compute (often NL, no Lean).
