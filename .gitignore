@@ -18,5 +18,6 @@ data/cache/
 data/gsm8k/
 data/math/
 outputs/
+data/curriculum/
 .DS_Store
 Thumbs.db

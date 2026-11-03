@@ -100,6 +100,62 @@ def eval_cmd(
 
 
 @app.command()
+def formal(
+    problem: str = typer.Argument(..., help="Hard theorem / research-style statement"),
+    no_curriculum: bool = typer.Option(False, help="Skip statement curriculum step"),
+    out: Optional[Path] = typer.Option(None, help="Write full JSON result"),
+) -> None:
+    """
+    Low-resource formal pipeline (OpenAI formal-math + DeepSeek-Prover style).
+
+    Decompose → certify lemmas (SymPy/finite; Lean if installed) → report gaps.
+    Honest about Fields-level: local cert ≠ journal-ready proof.
+    """
+    from mathagent.formal.pipeline import FormalPipeline
+
+    pipe = FormalPipeline(use_curriculum=not no_curriculum, on_event=console.print)
+    result = pipe.run(problem)
+    console.print(
+        Panel(
+            f"verdict={result.verdict}\n"
+            f"certified={result.proved_count}/{result.total_subgoals}\n"
+            f"lean={result.lean_available}\n"
+            f"insight={result.plan.get('key_insight', '')}",
+            title="Formal result",
+            border_style="magenta",
+        )
+    )
+    if result.gaps:
+        console.print(Panel("\n".join(f"• {g}" for g in result.gaps[:12]), title="Gaps"))
+    if out:
+        payload = {
+            "problem": result.problem,
+            "verdict": result.verdict,
+            "proved_count": result.proved_count,
+            "total_subgoals": result.total_subgoals,
+            "lean_available": result.lean_available,
+            "plan": result.plan,
+            "curriculum": result.curriculum,
+            "gaps": result.gaps,
+            "outcomes": [
+                {
+                    "subgoal": o.subgoal,
+                    "solver": o.solver,
+                    "certificate": {
+                        "ok": o.certificate.ok,
+                        "method": o.certificate.method,
+                        "detail": o.certificate.detail[:2000],
+                    },
+                }
+                for o in result.outcomes
+            ],
+        }
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        console.print(f"Wrote {out}")
+
+
+@app.command()
 def doctor() -> None:
     """Show resolved settings (secrets redacted)."""
     s = get_settings()
@@ -108,6 +164,7 @@ def doctor() -> None:
     console.print(
         {
             "model": s.model,
+            "formal_model": s.resolved_formal_model,
             "base_url": s.base_url,
             "api_key": redacted,
             "max_turns": s.max_turns,

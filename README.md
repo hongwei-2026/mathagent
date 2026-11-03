@@ -42,6 +42,40 @@ User problem
 5. **Bundled samples + HF download** — start offline; scale to GSM8K/MATH when ready
 6. **CLI + Streamlit UI** — one package for scripted eval and interactive demos
 
+## Formal / Fields-oriented mode (low resource)
+
+Goal: push toward **olympiad → research-shaped** problems on a laptop by copying the
+*architecture* of frontier systems, not their GPU clusters.
+
+| System | Idea we reuse |
+|---|---|
+| [OpenAI formal-math](https://openai.com/index/formal-math/) | Statement curriculum learning + search against a verifier |
+| [DeepSeek-Prover-V2](https://github.com/deepseek-ai/DeepSeek-Prover-V2) | NL sketch → Lean `have`/`sorry` subgoals → recursive certify |
+| Aristotle (IMO'25 formal) | Informal reasoning + lemma autoformalization + hard check |
+
+```text
+hard problem
+   │
+   ├─ statement curriculum (easier → harder)
+   ├─ informal sketch + key insight
+   ├─ subgoal list (Lean stubs + SymPy hints)
+   │     └─ certify each: SymPy / finite Python / Lean(optional)
+   └─ lemma bank memory  →  reuse on next harder problem
+```
+
+```bash
+# DeepSeek reasoner plans; SymPy certifies cheap lemmas
+mathagent formal "Prove AM-GM: (x+y)/2 >= sqrt(xy) for x,y>0" --out outputs/amgm.json
+
+# Research/open problems: expect verdict=partial + explicit gaps (honest)
+mathagent formal "Twin prime conjecture: produce curriculum + mark the open gap"
+```
+
+Install Lean 4 later to turn `lean_sketch` into hard kernel checks (`lean` on PATH).
+
+> **Honesty:** Fields Medal mathematics is not “solved by an API call”. This pipeline
+> maximizes what a **low-resource** stack can *certify* and clearly isolates remaining gaps.
+
 ## Quick start
 
 ```bash
@@ -53,26 +87,30 @@ pip install -e ".[dev]"
 # 2) configure
 copy .env.example .env   # then edit MATHAGENT_API_KEY / MODEL / BASE_URL
 
-# 3) solve one problem
+# 3) solve one problem (tool agent)
 mathagent solve "Solve 2x+5=17"
 
-# 4) offline tool smoke test (no API key)
+# 4) formal pipeline (Fields-oriented decomposition)
+mathagent formal "Prove that there are infinitely many primes."
+
+# 5) offline tool smoke test (no API key)
 python scripts/smoke_tools.py
 
-# 5) evaluate bundled samples
+# 6) evaluate bundled samples
 mathagent eval --dataset samples --limit 5
 
-# 6) UI
+# 7) UI
 streamlit run src/mathagent/ui_app.py
 ```
 
 ### DeepSeek / Ollama examples
 
 ```env
-# DeepSeek
+# DeepSeek (recommended for this repo)
 MATHAGENT_API_KEY=sk-...
-MATHAGENT_BASE_URL=https://api.deepseek.com/v1
+MATHAGENT_BASE_URL=https://api.deepseek.com
 MATHAGENT_MODEL=deepseek-chat
+MATHAGENT_FORMAL_MODEL=deepseek-reasoner
 
 # Ollama
 MATHAGENT_API_KEY=ollama
