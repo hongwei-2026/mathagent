@@ -1,0 +1,6 @@
+name = "mathagent_verify"
+version = "0.1.0"
+defaultTargets = ["MathAgentVerify"]
+
+[[lean_lib]]
+name = "MathAgentVerify"

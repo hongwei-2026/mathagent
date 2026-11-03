@@ -19,5 +19,8 @@ data/gsm8k/
 data/math/
 outputs/
 data/curriculum/
+lean_workspace/.lake/
+lean_workspace/lake-manifest.json
+lean_workspace/Scratch.lean
 .DS_Store
 Thumbs.db

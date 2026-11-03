@@ -21,10 +21,16 @@ class Settings(BaseSettings):
     max_turns: int = 8
     code_timeout_sec: float = 8.0
     max_output_chars: int = 4000
+    # Lean 4 on D: (never default to C:\Users\...\.elan)
+    lean_home: str = "D:/lean/elan"
+    lean_workspace: str = "D:/mathagent/lean_workspace"
+    lean_tmp: str = "D:/lean/tmp"
+    lean_cache: str = "D:/lean/cache"
 
     @property
     def resolved_formal_model(self) -> str:
         return self.formal_model or self.model
+
 
 
 @lru_cache

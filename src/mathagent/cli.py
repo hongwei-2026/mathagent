@@ -14,6 +14,9 @@ from mathagent.config import get_settings
 from mathagent.data.loader import load_benchmark, load_local_samples
 from mathagent.eval.grader import math_equal
 
+# Path already imported above for eval/formal outputs
+
+
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="MathAgent CLI")
 console = Console()
 
@@ -155,9 +158,40 @@ def formal(
         console.print(f"Wrote {out}")
 
 
+@app.command("lean-check")
+def lean_check_cmd(
+    file: Optional[Path] = typer.Option(None, help="Lean file (default: workspace Scratch.lean)"),
+    code: Optional[str] = typer.Option(None, help="Inline Lean snippet"),
+) -> None:
+    """Typecheck a Lean snippet using the D: workspace (local, no cloud)."""
+    from mathagent.formal.lean_check import check_lean_snippet, lean_available
+    from mathagent.formal.lean_env import lean_elan_home, lean_workspace
+
+    console.print(
+        {
+            "elan_home": str(lean_elan_home()),
+            "workspace": str(lean_workspace()),
+            "lean_available": lean_available(),
+        }
+    )
+    if code:
+        src = code
+    elif file:
+        src = file.read_text(encoding="utf-8")
+    else:
+        scratch = lean_workspace() / "Scratch.lean"
+        src = scratch.read_text(encoding="utf-8") if scratch.exists() else "theorem t : True := trivial"
+    result = check_lean_snippet(src)
+    style = "green" if result.ok else "red"
+    console.print(Panel(f"ok={result.ok}\n{result.stderr or result.stdout}", title="Lean check", border_style=style))
+
+
 @app.command()
 def doctor() -> None:
     """Show resolved settings (secrets redacted)."""
+    from mathagent.formal.lean_check import lean_available
+    from mathagent.formal.lean_env import lean_elan_home, lean_workspace
+
     s = get_settings()
     key = s.api_key
     redacted = (key[:4] + "…" + key[-4:]) if len(key) > 8 else ("(empty)" if not key else "****")
@@ -169,6 +203,10 @@ def doctor() -> None:
             "api_key": redacted,
             "max_turns": s.max_turns,
             "temperature": s.temperature,
+            "lean_home": str(lean_elan_home()),
+            "lean_workspace": str(lean_workspace()),
+            "lean_available": lean_available(),
+            "c_user_elan_exists": Path.home().joinpath(".elan").exists(),
         }
     )
 

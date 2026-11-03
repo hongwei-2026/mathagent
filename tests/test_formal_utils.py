@@ -23,12 +23,27 @@ def test_certify_sympy_inequality():
 def test_certify_lean_fallback_to_sympy_hint():
     sg = {
         "certify": "lean",
-        "lean_sketch": "theorem t : True := by trivial",
+        "lean_sketch": "theorem",  # too short / unusable → sympy fallback
         "sympy_hint": "(a-b)**2",
         "statement": "For all real a,b, (a-b)^2 >= 0",
     }
     res = certify_subgoal(sg, {"status": "proved", "certificate": {"type": "lean", "payload": "theorem"}})
     assert res.ok, res.detail
+
+
+def test_certify_lean_hard_when_available():
+    from mathagent.formal.lean_check import lean_available
+
+    if not lean_available():
+        return
+    sg = {
+        "certify": "lean",
+        "lean_sketch": "theorem t : True := trivial",
+        "statement": "True",
+    }
+    res = certify_subgoal(sg, {"status": "proved", "certificate": {"type": "lean", "payload": "theorem t : True := trivial"}})
+    assert res.ok and res.method == "lean", res
+
 
 
 

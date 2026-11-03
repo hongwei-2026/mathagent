@@ -71,7 +71,26 @@ mathagent formal "Prove AM-GM: (x+y)/2 >= sqrt(xy) for x,y>0" --out outputs/amgm
 mathagent formal "Twin prime conjecture: produce curriculum + mark the open gap"
 ```
 
-Install Lean 4 later to turn `lean_sketch` into hard kernel checks (`lean` on PATH).
+### Lean 4 on D: (local, no cloud)
+
+Lean runs **fully offline/local**. Cloud is optional. This repo pins everything to D:
+
+| Path | Purpose |
+|---|---|
+| `D:\lean\elan` | `ELAN_HOME` + toolchains |
+| `D:\lean\cache` / `D:\lean\tmp` | caches & temp |
+| `D:\mathagent\lean_workspace` | lake project for agent sketches |
+
+```powershell
+# one-time env (already set by installer)
+$env:ELAN_HOME='D:\lean\elan'
+$env:Path = "D:\lean\elan\bin;$env:Path"
+
+mathagent lean-check --code "theorem t : True := trivial"
+mathagent formal "Prove Nat.add_comm" --out outputs/formal.json
+```
+
+Mathlib is optional and large; core Lean is enough for many algebraic kernels. Add mathlib later inside `lean_workspace` if needed.
 
 > **Honesty:** Fields Medal mathematics is not “solved by an API call”. This pipeline
 > maximizes what a **low-resource** stack can *certify* and clearly isolates remaining gaps.

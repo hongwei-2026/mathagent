@@ -157,20 +157,44 @@ def certify_subgoal(subgoal: dict[str, Any], solver_payload: dict[str, Any] | No
             return s
         return ""
 
-    # Prefer hard Lean when requested AND available
-    if (certify == "lean" or cert.get("type") == "lean") and lean_available():
-        code = cert.get("payload") or subgoal.get("lean_sketch") or ""
-        lean_res: LeanCheckResult = check_lean_snippet(code)
-        return CertificateResult(lean_res.ok, "lean", lean_res.stderr or lean_res.stdout)
+    stmt = str(subgoal.get("statement", ""))
 
-    # Lean requested but missing → fall back to sympy hint if present
+    # Prefer hard Lean when requested AND available; fall back to SymPy on failure.
+    if (certify == "lean" or cert.get("type") == "lean") and lean_available():
+        code = ""
+        payload = str(cert.get("payload") or "")
+        sketch = str(subgoal.get("lean_sketch") or "")
+        for candidate in (payload, sketch):
+            if candidate and "theorem" in candidate and len(candidate) > 20:
+                code = candidate
+                break
+            if candidate and "example" in candidate and len(candidate) > 20:
+                code = candidate
+                break
+            if candidate and ":=" in candidate:
+                code = candidate
+                break
+        if code:
+            lean_res: LeanCheckResult = check_lean_snippet(code)
+            if lean_res.ok:
+                return CertificateResult(True, "lean", lean_res.stderr or lean_res.stdout or "ok")
+            # keep lean error but try sympy fallback below
+            lean_err = lean_res.stderr or lean_res.stdout
+        else:
+            lean_err = "no usable lean sketch/payload"
+
+        hint = _clean_sympy_hint()
+        if hint:
+            sym = certify_algebraic_claim(hint, statement=stmt)
+            if sym.ok:
+                return CertificateResult(True, f"sympy_fallback", f"{sym.detail} | lean_err={lean_err[:200]}")
+        return CertificateResult(False, "lean", lean_err)
+
     if certify in {"lean", "sympy"} or cert.get("type") in {"lean", "sympy", "text"}:
         hint = _clean_sympy_hint()
         if hint and cert.get("type") != "python":
-            return certify_algebraic_claim(hint, statement=str(subgoal.get("statement", "")))
+            return certify_algebraic_claim(hint, statement=stmt)
         if certify == "lean" and not lean_available():
-            # last resort: try to build inequality from statement keywords
-            stmt = str(subgoal.get("statement", ""))
             m = re.search(r"([a-zA-Z0-9_\+\-\*/\(\)\s\^]+)\s*(>=|≥)\s*0", stmt)
             if m:
                 return _check_nonneg_poly(m.group(1).replace("^", "**"))
