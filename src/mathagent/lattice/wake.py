@@ -49,26 +49,32 @@ def wake_attempt(
     else:
         detail = ""
 
-    # SymPy / finite soft certificate via existing certify layer
+    # SymPy / finite soft certificate — only with a real witness (no empty "proved")
+    hint = str(node.meta.get("sympy_hint") or "").strip()
+    certify = str(node.meta.get("certify_hint") or ("sympy" if hint else "manual")).lower()
+    lean_stub = str(node.meta.get("lean_stub") or "").strip()
     sg = {
         "statement": node.statement,
-        "certify": node.meta.get("certify_hint") or "sympy",
-        "sympy_hint": node.meta.get("sympy_hint") or "",
-        "lean_sketch": node.meta.get("lean_stub") or "",
+        "certify": certify,
+        "sympy_hint": hint,
+        "lean_sketch": lean_stub,
     }
-    if sg["sympy_hint"] or sg["certify"] in {"sympy", "finite_check"}:
+    has_witness = bool(hint) or (certify == "finite_check" and hint) or (
+        certify == "lean" and lean_stub
+    )
+    if has_witness:
         cert = certify_subgoal(
             sg,
-            {
-                "status": "proved",
-                "certificate": {"type": sg["certify"], "payload": sg["sympy_hint"]},
-            },
+            {"certificate": {"type": certify, "payload": hint or lean_stub}},
         )
         if cert.ok:
             graph.admit_lemma(node.statement, certificate=cert.method, parent_id=node.id)
             node.status = NodeStatus.CERTIFIED
             node.certificate = cert.method
             return WakeOutcome(node.id, True, cert.method, cert.detail)
+        detail = detail or cert.detail
+    elif certify in {"sympy", "finite_check", "lean"}:
+        detail = detail or "missing sympy_hint/lean_stub for cheap certificate"
 
     # Blocked → Gap
     reason = detail or "unproved within wake budget"

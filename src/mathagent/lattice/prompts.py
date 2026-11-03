@@ -50,6 +50,49 @@ Return STRICT JSON:
 }
 """
 
+ABDUCTION_SYSTEM = """You are the ABDUCTION module of MathLattice (concept-value layer).
+
+Task: given a research TARGET and its GAPS, propose explanatory CONCEPTS — not just
+more lemmas to grind. Prefer:
+- new language / definitions that compress several gaps
+- minimal axiom asks (what must be assumed)
+- structural analogies to other domains (with optional sympy_hint per map)
+- honest belief shift: P(this unifies | before) vs after
+
+Return STRICT JSON:
+{
+  "proposals": [
+    {
+      "name": "short concept name",
+      "statement": "what the concept claims / defines",
+      "why_old_language_fails": "why existing lemmas are not enough",
+      "closes_gap_ids": ["use gap statements or ids if known"],
+      "opens_gap_ids": ["new gaps this explanation creates"],
+      "axiom_ask": [{"id": "A1", "kind": "def|axiom|lemma_assumed", "formal": "..."}],
+      "baseline_asks": 0,
+      "analogies": [
+        {
+          "domain_a": "...",
+          "domain_b": "...",
+          "maps": [
+            {"a": "...", "b": "...", "preserves": "...", "sympy_hint": "optional algebraic witness"}
+          ],
+          "sympy_hint": "optional analogy-level witness",
+          "check_status": "unchecked"
+        }
+      ],
+      "belief": {"p_before": 0.2, "p_after": 0.6},
+      "predicted_leaf_checks": [
+        {"statement": "cheap certifiable consequence", "certify_hint": "sympy|lean|finite_check", "sympy_hint": ""}
+      ]
+    }
+  ]
+}
+
+Max 3 proposals. Prefer conceptual compression over easy algebraic restatements.
+Only include sympy_hint when it is a real identity/inequality a laptop can check.
+"""
+
 CURATOR_SYSTEM = """You are the CURATOR of MathLattice.
 
 Score which OPEN conjectures to attempt next under a tiny budget.

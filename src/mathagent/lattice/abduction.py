@@ -9,46 +9,8 @@ from openai import OpenAI
 from mathagent.config import Settings
 from mathagent.formal.json_util import extract_json
 from mathagent.lattice.graph import NodeKind, ResearchGraph
+from mathagent.lattice.prompts import ABDUCTION_SYSTEM
 from mathagent.lattice.value import needs_human_gate, score_proposal
-
-ABDUCTION_SYSTEM = """You are the ABDUCTION module of MathLattice (concept-value layer).
-
-Task: given a research TARGET and its GAPS, propose explanatory CONCEPTS — not just
-more lemmas to grind. Prefer:
-- new language / definitions that compress several gaps
-- minimal axiom asks (what must be assumed)
-- structural analogies to other domains
-- honest belief shift: P(this unifies | before) vs after
-
-Return STRICT JSON:
-{
-  "proposals": [
-    {
-      "name": "short concept name",
-      "statement": "what the concept claims / defines",
-      "why_old_language_fails": "why existing lemmas are not enough",
-      "closes_gap_ids": ["use gap statements or ids if known"],
-      "opens_gap_ids": [],
-      "axiom_ask": [{"id": "A1", "kind": "def|axiom|lemma_assumed", "formal": "..."}],
-      "baseline_asks": 0,
-      "analogies": [
-        {
-          "domain_a": "...",
-          "domain_b": "...",
-          "maps": [{"a": "...", "b": "...", "preserves": "..."}],
-          "check_status": "unchecked"
-        }
-      ],
-      "belief": {"p_before": 0.2, "p_after": 0.6},
-      "predicted_leaf_checks": [
-        {"statement": "cheap certifiable consequence", "certify_hint": "sympy|lean|finite_check", "sympy_hint": ""}
-      ]
-    }
-  ]
-}
-
-Max 3 proposals. Prefer conceptual compression over easy algebraic restatements.
-"""
 
 
 def run_abduction(
@@ -62,7 +24,11 @@ def run_abduction(
     gaps = graph.by_kind(NodeKind.GAP)
     targets = graph.by_kind(NodeKind.TARGET)
     target_txt = targets[0].statement if targets else graph.project_id
-    gap_txt = "\n".join(f"- [{g.id}] {g.statement}" for g in gaps[:12]) or "(none yet)"
+    gap_lines = []
+    for g in gaps[:12]:
+        reason = (g.meta or {}).get("reason", "")
+        gap_lines.append(f"- [{g.id}] {g.statement}" + (f" (reason: {reason})" if reason else ""))
+    gap_txt = "\n".join(gap_lines) or "(none yet)"
 
     emit("[lattice/abduction] proposing concepts")
     model = settings.resolved_formal_model
@@ -89,7 +55,6 @@ def run_abduction(
     scored: list[dict[str, Any]] = []
     gap_by_stmt = {g.statement: g.id for g in gaps}
     for prop in data.get("proposals") or []:
-        # resolve gap ids by substring match if model returned statements
         closes = []
         for x in prop.get("closes_gap_ids") or []:
             if x in graph.nodes:
@@ -115,6 +80,19 @@ def run_abduction(
         concept.meta["analogies"] = prop.get("analogies") or []
         concept.meta["belief"] = prop.get("belief") or {}
         concept.meta["predicted_leaf_checks"] = prop.get("predicted_leaf_checks") or []
+        # Persist explanation cost as real gaps (HALO-style price of abduction)
+        open_ids: list[str] = []
+        for raw in prop.get("opens_gap_ids") or []:
+            stmt = str(raw).strip()
+            if not stmt:
+                continue
+            if stmt in graph.nodes:
+                open_ids.append(stmt)
+                continue
+            gap = graph.add_gap(stmt, parent_id=concept.id, reason="opened_by_concept")
+            open_ids.append(gap.id)
+        concept.meta["opens_gap_ids"] = open_ids
+        prop["opens_gap_ids"] = open_ids
         prop["node_id"] = concept.id
         scored.append(prop)
         emit(

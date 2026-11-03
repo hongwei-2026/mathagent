@@ -264,6 +264,10 @@ def lattice_gate(
     if node is None or node.kind != NodeKind.CONCEPT:
         console.print(f"[red]Not a concept: {concept_id}[/red]")
         raise typer.Exit(1)
+    from datetime import datetime, timezone
+
+    from mathagent.lattice.curator import spawn_leaf_conjectures_from_concepts
+
     act = action.strip().lower()
     if act == "accept":
         node.status = NodeStatus.ACCEPTED
@@ -276,9 +280,13 @@ def lattice_gate(
     gate["required"] = False
     gate["notes"] = note
     gate["decision"] = act
+    gate["reviewed_at"] = datetime.now(timezone.utc).isoformat()
     node.meta["human_gate"] = gate
+    spawned = 0
+    if act == "accept":
+        spawned = len(spawn_leaf_conjectures_from_concepts(graph))
     path = store.save(graph)
-    console.print(f"{act} {concept_id} → {path}")
+    console.print(f"{act} {concept_id} spawned_leaves={spawned} → {path}")
 
 
 @app.command()

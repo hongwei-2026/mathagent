@@ -4,8 +4,8 @@ MathLattice pipeline — Fields-oriented research architecture on a laptop budge
 Default: conjecture pool → typed graph → wake (econ/certify) → sleep → curator.
 
 Concept-value mode (A→E):
-  A abduction → B concept slots → C analogy maps → D surprise/curator rank →
-  E human co-abduction gate → wake cheap leaves only for accepted/open concepts.
+  A abduction → B concept slots → C analogy maps (+ refresh gate) →
+  E human co-abduction gate → D curator spawn/rank → wake only ACCEPTED/OPEN concept leaves.
 """
 
 from __future__ import annotations
@@ -22,7 +22,11 @@ from mathagent.formal.econ import EconEngine
 from mathagent.lattice.abduction import run_abduction
 from mathagent.lattice.analogy import enrich_concepts_with_analogy_checks
 from mathagent.lattice.conjecture import generate_conjecture_pool
-from mathagent.lattice.curator import curator_report, spawn_leaf_conjectures_from_concepts
+from mathagent.lattice.curator import (
+    curator_report,
+    spawn_leaf_conjectures_from_concepts,
+    wake_frontier,
+)
 from mathagent.lattice.graph import GraphStore, Node, NodeKind, NodeStatus, ResearchGraph
 from mathagent.lattice.sleep import sleep_consolidate
 from mathagent.lattice.wake import WakeOutcome, wake_attempt
@@ -129,16 +133,16 @@ class LatticePipeline:
                 settings=self.settings,
                 on_event=self.on_event,
             )
-            # C analogy / structure maps
+            # C analogy / structure maps (also refreshes human_gate from systematicity)
             self.on_event("[lattice/analogy] checking maps")
             enrich_concepts_with_analogy_checks(graph)
-            # E human co-abduction gate (optional auto-accept for smoke)
+            # E human co-abduction gate (optional auto-accept for smoke only)
             if self.auto_accept_concepts:
                 for n in graph.by_kind(NodeKind.CONCEPT):
                     if n.status == NodeStatus.HUMAN_REVIEW:
                         n.status = NodeStatus.ACCEPTED
                         self.on_event(f"[lattice/gate] auto-accepted {n.id}")
-            # D curator: spawn predicted cheap leaves from concepts
+            # D curator: spawn leaves only for ACCEPTED / ungated OPEN concepts
             spawned = spawn_leaf_conjectures_from_concepts(graph)
             self.on_event(f"[lattice/curator] spawned {len(spawned)} concept-leaves")
 
@@ -155,26 +159,16 @@ class LatticePipeline:
         for rnd in range(self.wake_rounds):
             self.on_event(f"[lattice] wake round {rnd + 1}/{self.wake_rounds}")
             if self.concept_value:
-                # Prefer leaves tagged from_concept; fall back to ordinary open conjectures
-                frontier = [
-                    n
-                    for n in graph.frontier(limit=self.max_wake_nodes * 2)
-                    if n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN
-                ]
-                frontier.sort(
-                    key=lambda n: (
-                        1 if n.meta.get("from_concept") else 0,
-                        n.score,
-                    ),
-                    reverse=True,
-                )
-                frontier = frontier[: self.max_wake_nodes]
+                frontier = wake_frontier(graph, limit=self.max_wake_nodes)
             else:
+                # Conjecture-only pick — avoid TARGET/GAP eating frontier slots
                 frontier = [
                     n
-                    for n in graph.frontier(limit=self.max_wake_nodes)
+                    for n in graph.nodes.values()
                     if n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN
                 ]
+                frontier.sort(key=lambda n: -n.score)
+                frontier = frontier[: self.max_wake_nodes]
             if not frontier:
                 break
             for node in frontier:

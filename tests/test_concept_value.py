@@ -56,11 +56,12 @@ def test_spawn_leaves_and_curator():
         scores={"conceptual_value": 0.7, "compression": 0.6, "surprise": 0.4},
         human_gate=False,
     )
+    assert c.status == NodeStatus.OPEN
     c.meta["predicted_leaf_checks"] = [
         {
             "statement": "(x+y)^2 = x^2 + 2*x*y + y^2",
             "certify_hint": "sympy",
-            "sympy_hint": "expand((x+y)**2 - (x**2 + 2*x*y + y**2))",
+            "sympy_hint": "(x+y)**2 = x**2 + 2*x*y + y**2",
         }
     ]
     spawned = spawn_leaf_conjectures_from_concepts(g)
@@ -70,9 +71,31 @@ def test_spawn_leaves_and_curator():
     assert report["concepts"] == 1
 
 
+def test_spawn_skips_human_review():
+    g = ResearchGraph(project_id="cv3")
+    c = g.admit_concept("gated concept", name="gated", human_gate=True)
+    c.meta["predicted_leaf_checks"] = [
+        {"statement": "leaf should not spawn", "sympy_hint": "(a-b)**2"}
+    ]
+    assert c.status == NodeStatus.HUMAN_REVIEW
+    assert spawn_leaf_conjectures_from_concepts(g) == []
+    c.status = NodeStatus.ACCEPTED
+    assert len(spawn_leaf_conjectures_from_concepts(g)) == 1
+
+
 def test_analogy_unchecked_without_hint():
     verified, claimed = verify_analogy_maps(
         [{"domain_a": "groups", "domain_b": "rings", "maps": [{"a": "hom", "b": "hom"}]}]
     )
     assert claimed == 1
     assert verified == 0
+
+
+def test_empty_hint_does_not_manual_prove():
+    from mathagent.formal.certify import certify_subgoal
+
+    res = certify_subgoal(
+        {"certify": "sympy", "sympy_hint": "", "statement": "anything"},
+        {"status": "proved"},
+    )
+    assert not res.ok

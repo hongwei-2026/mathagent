@@ -203,6 +203,8 @@ def certify_subgoal(subgoal: dict[str, Any], solver_payload: dict[str, Any] | No
                 "lean_unavailable",
                 "lean not installed; provide sympy_hint for cheap certification",
             )
+        if certify == "sympy":
+            return CertificateResult(False, "sympy", "missing sympy_hint")
 
     if certify == "finite_check" or cert.get("type") == "python":
         code = cert.get("payload") or subgoal.get("sympy_hint") or ""
@@ -214,9 +216,9 @@ def certify_subgoal(subgoal: dict[str, Any], solver_payload: dict[str, Any] | No
         )
         return CertificateResult(ok, "python", out)
 
-    status = (solver_payload.get("status") or "").lower()
+    # Never treat empty solver "proved" as a certificate — that bypasses the lattice.
     return CertificateResult(
-        status == "proved",
+        False,
         "manual",
-        solver_payload.get("informal_proof") or "no hard certificate",
+        solver_payload.get("informal_proof") or "no hard certificate (manual prove disabled)",
     )

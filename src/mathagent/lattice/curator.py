@@ -9,10 +9,9 @@ from mathagent.lattice.graph import Node, NodeKind, NodeStatus, ResearchGraph
 
 def rank_for_exploration(graph: ResearchGraph, limit: int = 5) -> list[Node]:
     """
-    Priority:
-      1) ACCEPTED concepts' predicted leaf checks (as synthetic conjectures already in meta)
-      2) Concepts with high conceptual_value but still OPEN/HUMAN_REVIEW (need gate note)
-      3) Ordinary conjectures with certify_hint (cheap leaves) — lower weight
+    Rank OPEN conjectures for wake (concept leaves first), with concepts listed
+    for reporting. HUMAN_REVIEW concepts are deprioritized; their leaves are not
+    spawned until ACCEPTED (see spawn_leaf_conjectures_from_concepts).
     """
     ranked: list[tuple[float, Node]] = []
     for n in graph.nodes.values():
@@ -23,24 +22,45 @@ def rank_for_exploration(graph: ResearchGraph, limit: int = 5) -> list[Node]:
         surprise = float(scores.get("surprise", 0.0))
         compression = float(scores.get("compression", 0.0))
         if n.kind == NodeKind.CONCEPT:
-            # explore consequences of high-V concepts; gate-pending still listed but lower
-            gate_pen = 0.15 if n.status == NodeStatus.HUMAN_REVIEW else 0.0
+            if n.status == NodeStatus.HUMAN_REVIEW:
+                gate_pen = 0.25
+            elif n.status == NodeStatus.ACCEPTED:
+                gate_pen = -0.1
+            else:
+                gate_pen = 0.0
             ranked.append((0.7 * v + 0.2 * surprise + 0.1 * compression - gate_pen, n))
-        elif n.kind == NodeKind.CONJECTURE:
-            # cheap leaves get modest score unless tagged from_concept
-            bonus = 0.25 if n.meta.get("from_concept") else 0.0
-            ranked.append((0.35 * n.score + bonus + 0.1 * compression, n))
+        elif n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN:
+            parent = graph.nodes.get(str(n.meta.get("from_concept") or ""))
+            if parent and parent.status == NodeStatus.HUMAN_REVIEW:
+                continue  # do not explore leaves of ungated concepts
+            bonus = 0.35 if n.meta.get("from_concept") else 0.0
+            ranked.append((0.35 * n.score + bonus + 0.1 * compression + 0.15 * surprise, n))
         elif n.kind == NodeKind.GAP:
             ranked.append((0.2 + 0.1 * surprise, n))
     ranked.sort(key=lambda x: -x[0])
     return [n for _, n in ranked[:limit]]
 
 
+def wake_frontier(graph: ResearchGraph, limit: int = 5) -> list[Node]:
+    """Curator-driven wake picker: OPEN conjectures only, ranked."""
+    out: list[Node] = []
+    for n in rank_for_exploration(graph, limit=limit * 3):
+        if n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN:
+            out.append(n)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def spawn_leaf_conjectures_from_concepts(graph: ResearchGraph) -> list[Node]:
-    """Materialize predicted_leaf_checks as Conjecture nodes linked to Concept."""
+    """Materialize predicted_leaf_checks only for ACCEPTED or ungated OPEN concepts."""
     spawned: list[Node] = []
     for c in graph.by_kind(NodeKind.CONCEPT):
         if c.status == NodeStatus.REJECTED:
+            continue
+        if c.status == NodeStatus.HUMAN_REVIEW:
+            continue
+        if c.status not in {NodeStatus.ACCEPTED, NodeStatus.OPEN}:
             continue
         for leaf in c.meta.get("predicted_leaf_checks") or []:
             stmt = str(leaf.get("statement", "")).strip()
@@ -48,12 +68,14 @@ def spawn_leaf_conjectures_from_concepts(graph: ResearchGraph) -> list[Node]:
                 continue
             if any(n.statement == stmt for n in graph.nodes.values()):
                 continue
+            hint = str(leaf.get("sympy_hint") or "").strip()
+            certify = leaf.get("certify_hint") or ("sympy" if hint else "manual")
             node = Node.new(
                 NodeKind.CONJECTURE,
                 stmt,
                 from_concept=c.id,
-                certify_hint=leaf.get("certify_hint") or "sympy",
-                sympy_hint=leaf.get("sympy_hint") or "",
+                certify_hint=certify,
+                sympy_hint=hint,
                 lean_stub=leaf.get("lean_stub") or "",
             )
             node.score = max(0.55, float((c.meta.get("scores") or {}).get("conceptual_value", 0.5)))
