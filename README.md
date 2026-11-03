@@ -107,7 +107,9 @@ mathagent lean-check --code "theorem t : True := trivial"
 mathagent formal "Prove Nat.add_comm" --out outputs/formal.json
 ```
 
-Mathlib is optional and large; core Lean is enough for many algebraic kernels. Add mathlib later inside `lean_workspace` if needed.
+Mathlib (tried on D:): see `lean_mathlib/` (~7GB cache) and [docs/TRY_LOCAL_AND_MATHLIB.md](docs/TRY_LOCAL_AND_MATHLIB.md).
+
+Local 7B prover: `mathagent econ --local ...` after Ollama + `DeepSeek-Prover-V2-7B-GGUF` on `D:\models\ollama`.
 
 > **Honesty:** Fields Medal mathematics is not “solved by an API call”. This pipeline
 > maximizes what a **low-resource** stack can *certify* and clearly isolates remaining gaps.

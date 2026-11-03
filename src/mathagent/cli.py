@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -164,6 +165,7 @@ def econ(
     max_tokens: int = typer.Option(12000, help="Soft token budget"),
     max_repair: int = typer.Option(2, help="Lean repair attempts per sample"),
     max_samples: int = typer.Option(3, help="Cheap direct samples before decompose"),
+    local: bool = typer.Option(False, "--local", help="Prefer local Ollama prover (D: models)"),
     out: Optional[Path] = typer.Option(None, help="Write JSON result"),
 ) -> None:
     """
@@ -172,15 +174,37 @@ def econ(
     Cheap model first → Lean repair → decompose → escalate CoT only if needed.
     See docs/LOW_COST_PATH.md.
     """
+    from mathagent.config import Settings, reload_settings
     from mathagent.formal.budget import Budget
     from mathagent.formal.econ import EconEngine
+    from mathagent.local_llm import probe_ollama
+    from openai import OpenAI
+
+    settings = reload_settings()
+    client = None
+    if local:
+        st = probe_ollama()
+        if not st.available or not st.preferred:
+            console.print(f"[red]Local Ollama unavailable:[/red] {st.detail}")
+            console.print("Install Ollama, set OLLAMA_MODELS=D:\\models\\ollama, pull DeepSeek-Prover-V2-7B GGUF.")
+            raise typer.Exit(1)
+        console.print(f"[cyan]local[/cyan] {st.preferred} @ {st.base_url}")
+        settings = Settings(
+            api_key=os.environ.get("MATHAGENT_API_KEY", "ollama"),
+            base_url=st.base_url,
+            model=st.preferred,
+            formal_model=st.preferred,
+            lean_home=settings.lean_home,
+            lean_workspace=settings.lean_workspace,
+        )
+        client = OpenAI(api_key="ollama", base_url=st.base_url)
 
     budget = Budget(
         max_tokens=max_tokens,
         max_repair=max_repair,
         max_direct_samples=max_samples,
     )
-    engine = EconEngine(budget=budget, on_event=console.print)
+    engine = EconEngine(settings=settings, client=client, budget=budget, on_event=console.print)
     result = engine.run(problem)
     style = "green" if result.ok else "yellow"
     console.print(
@@ -252,6 +276,9 @@ def doctor() -> None:
     s = get_settings()
     key = s.api_key
     redacted = (key[:4] + "…" + key[-4:]) if len(key) > 8 else ("(empty)" if not key else "****")
+    from mathagent.local_llm import probe_ollama
+
+    local = probe_ollama()
     console.print(
         {
             "model": s.model,
@@ -264,6 +291,10 @@ def doctor() -> None:
             "lean_workspace": str(lean_workspace()),
             "lean_available": lean_available(),
             "c_user_elan_exists": Path.home().joinpath(".elan").exists(),
+            "ollama_available": local.available,
+            "ollama_model": local.preferred,
+            "ollama_detail": local.detail,
+            "mathlib_workspace_exists": Path("D:/mathagent/lean_mathlib").exists(),
         }
     )
 

@@ -22,5 +22,8 @@ data/curriculum/
 lean_workspace/.lake/
 lean_workspace/lake-manifest.json
 lean_workspace/Scratch.lean
+lean_mathlib/.lake/
+lean_mathlib/lake-manifest.json
+
 .DS_Store
 Thumbs.db

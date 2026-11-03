@@ -1,0 +1,15 @@
+name = "lean_mathlib"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["LeanMathlib"]
+
+[leanOptions]
+pp.unicode.fun = true
+relaxedAutoImplicit = false
+
+[[require]]
+name = "mathlib"
+path = ".lake/packages/mathlib"
+
+[[lean_lib]]
+name = "LeanMathlib"
