@@ -87,8 +87,8 @@ Only nodes with a **certificate** enter as `Lemma`:
 - SymPy/finite certify, or
 - explicit `manual_accepted` (human)
 
-Sleep-phase “abstract lemmas” are stored as **high-score Conjectures** until certified.
-Everything else stays `Conjecture` or `Gap`. Fields-level targets almost always retain Gaps — that is a feature.
+Sleep emits gated **`library_ops` → Concept**（`HUMAN_REVIEW`），不再写入高分未证 Conjecture。
+未认证内容保持 `Conjecture` / `Gap`。Fields 级目标几乎总保留 Gaps——这是特性。
 
 ## Mapping onto this repo
 

@@ -43,8 +43,44 @@ value scores did not accumulate across projects.
 | `lattice/think/evidence.py` | JSONL ledger with `delta_graph_dl`; boost/demote priors |
 | `lattice/think/loop.py` | start → mid (cheap+arena) → end (Δdl commit) |
 
+## Status machine (Concept)
+
+```text
+admit → OPEN | HUMAN_REVIEW
+         │         │
+         │    lattice-gate accept/reject
+         │         │
+         ▼         ▼
+      ACCEPTED   REJECTED ── spawn/wake 跳过
+         │
+    spawn predicted_leaf_checks → wake call_op
+         │
+    cheap_tests / arena ──败者──► REJECTED
+```
+
+## CLI
+
+```bash
+mathagent lattice "<problem>" --think [--auto-accept] [--wake-rounds 1] [--max-wake 3]
+mathagent lattice-gate <project_id> <concept_id> accept|reject --note "..."
+```
+
+- `--think` 隐含 concept-value 环，并跑 `run_think_cycle`（start / mid / end）。
+- `--auto-accept`：**仅烟测**；会跳过人类共谋门。
+- 证据写入：`data/lattice/evidence.jsonl`；图：`data/lattice/<project>.json`。
+
+## Design rationale (why three, not one mega-module)
+
+1. **Executable** closes DreamCoder’s gap: abstractions outside the action space are comments.
+2. **Arena + cheap tests** closes Robot-Scientist’s gap: hypotheses must die on failed predictions.
+3. **Evidence** closes lifelong/continual gap: one-run V scores cannot define “good concept”.
+
+Together they constrain *language change* in the research graph—not just sample more proofs.
+
 ## Acceptance (minimal)
 
-1. **Executable:** ≥1 library op with `sympy_template` + binding → `call_op` returns certify ok; wake prefers `call_op` over free-form LLM.
-2. **Arena:** ≥2 concepts sharing a gap → after leaf outcomes, exactly one remains non-`REJECTED` (or both rejected if all fail).
-3. **Evidence:** each think run appends records; next run can boost ops with historical `mdl_gain>0` / certify rate.
+1. **Executable:** ≥1 library op with `sympy_template` + binding → `call_op` ok; wake prefers `call_op`; invoke telemetry increments.
+2. **Arena / cheap:** ≥2 concepts on same gap; all-fail cheap predictions → `REJECTED`; else fitness keeps one winner.
+3. **Evidence:** each think end appends rows with `delta_graph_dl`; next run `prior_boost` can raise *or demote* by historical MDL.
+
+Tests: `tests/test_think_pillars.py`, `tests/test_concept_value.py`.
