@@ -165,10 +165,19 @@ def lattice(
     project: Optional[str] = typer.Option(None, help="Project id for graph persistence"),
     wake_rounds: int = typer.Option(1, help="Wake/sleep cycles"),
     max_wake: int = typer.Option(4, help="Max conjectures attempted per wake"),
+    concept_value: bool = typer.Option(
+        False, "--concept-value", help="A→E loop: abduction/concepts/analogy/curator/human-gate"
+    ),
+    auto_accept: bool = typer.Option(
+        False, "--auto-accept", help="Smoke only: auto-ACCEPT concepts (skips human co-abduction)"
+    ),
     out: Optional[Path] = typer.Option(None, help="Write JSON result"),
 ) -> None:
     """
     MathLattice: conjecture pool → research graph → wake/sleep (Fields-oriented architecture).
+
+    With --concept-value: abduction → Concept slots → analogy maps → curator rank →
+    human gate queue → wake prefers concept-linked cheap leaves.
 
     Does NOT claim Fields proofs. Builds certified lemmas + explicit gaps on a laptop budget.
     See docs/LATTICE_ARCHITECTURE.md.
@@ -180,21 +189,32 @@ def lattice(
         budget=Budget(max_tokens=14000, max_llm_calls=18, max_direct_samples=2),
         wake_rounds=wake_rounds,
         max_wake_nodes=max_wake,
+        concept_value=concept_value,
+        auto_accept_concepts=auto_accept,
         on_event=console.print,
     )
     result = pipe.run(problem, project_id=project)
     console.print(
         Panel(
+            f"mode={result.mode}\n"
             f"verdict={result.verdict}\n"
             f"difficulty={result.difficulty}\n"
             f"insight={result.key_insight}\n"
             f"graph={result.graph_summary}\n"
-            f"lemmas={len(result.certified_lemmas)} gaps={len(result.gaps)}\n"
+            f"lemmas={len(result.certified_lemmas)} gaps={len(result.gaps)} "
+            f"concepts={len(result.concepts)}\n"
+            f"human_review={result.human_review_queue}\n"
             f"saved={result.graph_path}",
             title="MathLattice",
             border_style="magenta",
         )
     )
+    if result.concepts:
+        lines = []
+        for c in result.concepts[:6]:
+            v = (c.get("scores") or {}).get("conceptual_value")
+            lines.append(f"• [{c['status']}] {c.get('name')}: V={v} — {c['statement'][:100]}")
+        console.print(Panel("\n".join(lines), title="Concepts"))
     if result.certified_lemmas:
         console.print(Panel("\n".join(f"• {x}" for x in result.certified_lemmas[:8]), title="Certified"))
     if result.gaps:
@@ -202,11 +222,15 @@ def lattice(
     if out:
         payload = {
             "project_id": result.project_id,
+            "mode": result.mode,
             "problem": result.problem,
             "verdict": result.verdict,
             "difficulty": result.difficulty,
             "key_insight": result.key_insight,
             "graph_summary": result.graph_summary,
+            "concepts": result.concepts,
+            "curator": result.curator,
+            "human_review_queue": result.human_review_queue,
             "certified_lemmas": result.certified_lemmas,
             "gaps": result.gaps,
             "sleep": result.sleep,
@@ -219,6 +243,42 @@ def lattice(
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         console.print(f"Wrote {out}")
+
+
+@app.command("lattice-gate")
+def lattice_gate(
+    project: str = typer.Argument(..., help="Project id (graph file under data/lattice)"),
+    concept_id: str = typer.Argument(..., help="Concept node id"),
+    action: str = typer.Argument(..., help="accept | reject"),
+    note: str = typer.Option("", help="Human co-abduction note"),
+) -> None:
+    """Accept or reject a Concept after human co-abduction review."""
+    from mathagent.lattice.graph import GraphStore, NodeKind, NodeStatus
+
+    store = GraphStore()
+    graph = store.load(project)
+    if graph is None:
+        console.print(f"[red]No graph for project={project}[/red]")
+        raise typer.Exit(1)
+    node = graph.nodes.get(concept_id)
+    if node is None or node.kind != NodeKind.CONCEPT:
+        console.print(f"[red]Not a concept: {concept_id}[/red]")
+        raise typer.Exit(1)
+    act = action.strip().lower()
+    if act == "accept":
+        node.status = NodeStatus.ACCEPTED
+    elif act == "reject":
+        node.status = NodeStatus.REJECTED
+    else:
+        console.print("[red]action must be accept|reject[/red]")
+        raise typer.Exit(1)
+    gate = dict(node.meta.get("human_gate") or {})
+    gate["required"] = False
+    gate["notes"] = note
+    gate["decision"] = act
+    node.meta["human_gate"] = gate
+    path = store.save(graph)
+    console.print(f"{act} {concept_id} → {path}")
 
 
 @app.command()

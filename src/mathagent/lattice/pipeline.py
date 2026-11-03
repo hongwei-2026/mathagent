@@ -1,7 +1,11 @@
 """
 MathLattice pipeline — Fields-oriented research architecture on a laptop budget.
 
-Conjecture pool → typed graph → wake (econ/certify) → sleep (abstract) → curator stop.
+Default: conjecture pool → typed graph → wake (econ/certify) → sleep → curator.
+
+Concept-value mode (A→E):
+  A abduction → B concept slots → C analogy maps → D surprise/curator rank →
+  E human co-abduction gate → wake cheap leaves only for accepted/open concepts.
 """
 
 from __future__ import annotations
@@ -15,7 +19,10 @@ from openai import OpenAI
 from mathagent.config import Settings, get_settings
 from mathagent.formal.budget import Budget
 from mathagent.formal.econ import EconEngine
+from mathagent.lattice.abduction import run_abduction
+from mathagent.lattice.analogy import enrich_concepts_with_analogy_checks
 from mathagent.lattice.conjecture import generate_conjecture_pool
+from mathagent.lattice.curator import curator_report, spawn_leaf_conjectures_from_concepts
 from mathagent.lattice.graph import GraphStore, Node, NodeKind, NodeStatus, ResearchGraph
 from mathagent.lattice.sleep import sleep_consolidate
 from mathagent.lattice.wake import WakeOutcome, wake_attempt
@@ -32,9 +39,13 @@ class LatticeResult:
     sleep: dict[str, Any] = field(default_factory=dict)
     gaps: list[str] = field(default_factory=list)
     certified_lemmas: list[str] = field(default_factory=list)
+    concepts: list[dict[str, Any]] = field(default_factory=list)
+    curator: dict[str, Any] = field(default_factory=dict)
+    human_review_queue: list[str] = field(default_factory=list)
     verdict: str = ""
     graph_path: str = ""
     budget: Budget | None = None
+    mode: str = "classic"
 
 
 def _project_id(problem: str) -> str:
@@ -51,6 +62,8 @@ class LatticePipeline:
         budget: Budget | None = None,
         wake_rounds: int = 1,
         max_wake_nodes: int = 5,
+        concept_value: bool = False,
+        auto_accept_concepts: bool = False,
     ) -> None:
         self.settings = settings or get_settings()
         if not self.settings.api_key:
@@ -63,20 +76,28 @@ class LatticePipeline:
         self.budget = budget or Budget(max_tokens=16_000, max_llm_calls=20, max_direct_samples=2)
         self.wake_rounds = wake_rounds
         self.max_wake_nodes = max_wake_nodes
+        self.concept_value = concept_value
+        self.auto_accept_concepts = auto_accept_concepts
         self.store = GraphStore()
 
     def run(self, problem: str, project_id: str | None = None) -> LatticeResult:
         pid = project_id or _project_id(problem)
         graph = self.store.load(pid) or ResearchGraph(project_id=pid)
 
-        # --- Conjecture phase ---
+        # --- Conjecture / map phase ---
         pool = generate_conjecture_pool(
             problem, client=self.client, settings=self.settings, on_event=self.on_event
         )
         target = graph.add(
-            Node.new(NodeKind.TARGET, str(pool.get("target") or problem), difficulty=pool.get("difficulty"))
+            Node.new(
+                NodeKind.TARGET,
+                str(pool.get("target") or problem),
+                difficulty=pool.get("difficulty"),
+            )
         )
-        plan = graph.add(Node.new(NodeKind.PLAN, str(pool.get("plan") or ""), insight=pool.get("key_insight")))
+        plan = graph.add(
+            Node.new(NodeKind.PLAN, str(pool.get("plan") or ""), insight=pool.get("key_insight"))
+        )
         graph.link(plan.id, target.id, "plans")
 
         for c in pool.get("conjectures") or []:
@@ -93,7 +114,33 @@ class LatticePipeline:
             graph.link(target.id, node.id, "depends")
 
         for g in pool.get("gaps") or []:
-            graph.add_gap(str(g.get("statement", "")), parent_id=target.id, reason=str(g.get("reason", "")))
+            graph.add_gap(
+                str(g.get("statement", "")),
+                parent_id=target.id,
+                reason=str(g.get("reason", "")),
+            )
+
+        proposals: list[dict[str, Any]] = []
+        if self.concept_value:
+            # A abduction → B concept slots (admit_concept inside)
+            proposals = run_abduction(
+                graph,
+                client=self.client,
+                settings=self.settings,
+                on_event=self.on_event,
+            )
+            # C analogy / structure maps
+            self.on_event("[lattice/analogy] checking maps")
+            enrich_concepts_with_analogy_checks(graph)
+            # E human co-abduction gate (optional auto-accept for smoke)
+            if self.auto_accept_concepts:
+                for n in graph.by_kind(NodeKind.CONCEPT):
+                    if n.status == NodeStatus.HUMAN_REVIEW:
+                        n.status = NodeStatus.ACCEPTED
+                        self.on_event(f"[lattice/gate] auto-accepted {n.id}")
+            # D curator: spawn predicted cheap leaves from concepts
+            spawned = spawn_leaf_conjectures_from_concepts(graph)
+            self.on_event(f"[lattice/curator] spawned {len(spawned)} concept-leaves")
 
         # --- Wake / Sleep rounds ---
         econ = EconEngine(
@@ -107,11 +154,27 @@ class LatticePipeline:
 
         for rnd in range(self.wake_rounds):
             self.on_event(f"[lattice] wake round {rnd + 1}/{self.wake_rounds}")
-            frontier = [
-                n
-                for n in graph.frontier(limit=self.max_wake_nodes)
-                if n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN
-            ]
+            if self.concept_value:
+                # Prefer leaves tagged from_concept; fall back to ordinary open conjectures
+                frontier = [
+                    n
+                    for n in graph.frontier(limit=self.max_wake_nodes * 2)
+                    if n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN
+                ]
+                frontier.sort(
+                    key=lambda n: (
+                        1 if n.meta.get("from_concept") else 0,
+                        n.score,
+                    ),
+                    reverse=True,
+                )
+                frontier = frontier[: self.max_wake_nodes]
+            else:
+                frontier = [
+                    n
+                    for n in graph.frontier(limit=self.max_wake_nodes)
+                    if n.kind == NodeKind.CONJECTURE and n.status == NodeStatus.OPEN
+                ]
             if not frontier:
                 break
             for node in frontier:
@@ -127,11 +190,39 @@ class LatticePipeline:
             )
 
         path = self.store.save(graph)
-        lemmas = [n.statement for n in graph.by_kind(NodeKind.LEMMA) if n.status == NodeStatus.CERTIFIED]
+        lemmas = [
+            n.statement
+            for n in graph.by_kind(NodeKind.LEMMA)
+            if n.status == NodeStatus.CERTIFIED
+        ]
         gaps = [n.statement for n in graph.by_kind(NodeKind.GAP)]
         difficulty = str(pool.get("difficulty") or "research")
+        report = curator_report(graph) if self.concept_value else {}
+        human_q = report.get("human_review_queue") or [
+            n.id for n in graph.by_kind(NodeKind.CONCEPT) if n.status == NodeStatus.HUMAN_REVIEW
+        ]
+        concept_blobs = [
+            {
+                "id": n.id,
+                "name": n.meta.get("name"),
+                "statement": n.statement,
+                "status": n.status.value,
+                "scores": n.meta.get("scores") or {},
+            }
+            for n in graph.by_kind(NodeKind.CONCEPT)
+        ]
 
-        if lemmas and not gaps:
+        if self.concept_value and concept_blobs:
+            top_v = max(
+                float((c.get("scores") or {}).get("conceptual_value") or 0) for c in concept_blobs
+            )
+            if human_q:
+                verdict = "concept_proposals_awaiting_human_gate"
+            elif lemmas:
+                verdict = "concept_driven_partial_progress"
+            else:
+                verdict = f"concepts_mapped_v_max={top_v:.2f}"
+        elif lemmas and not gaps:
             verdict = "locally_closed_sketch"
         elif lemmas:
             verdict = "partial_theory_progress"
@@ -151,7 +242,11 @@ class LatticePipeline:
             sleep=sleep_data,
             gaps=gaps,
             certified_lemmas=lemmas,
+            concepts=concept_blobs,
+            curator=report,
+            human_review_queue=list(human_q),
             verdict=verdict,
             graph_path=str(path),
             budget=self.budget,
+            mode="concept_value" if self.concept_value else "classic",
         )

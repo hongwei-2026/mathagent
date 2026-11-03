@@ -18,6 +18,8 @@ class NodeKind(str, Enum):
     PLAN = "plan"
     GAP = "gap"
     COUNTEREXAMPLE = "counterexample"
+    CONCEPT = "concept"  # new language / definition (structure-learning slot)
+    ABDUCTION = "abduction"  # explanatory proposal awaiting conceptual scoring
 
 
 class NodeStatus(str, Enum):
@@ -26,6 +28,9 @@ class NodeStatus(str, Enum):
     REFUTED = "refuted"
     BLOCKED = "blocked"
     ABSTRACTED = "abstracted"
+    HUMAN_REVIEW = "human_review"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
 
 
 @dataclass
@@ -43,8 +48,19 @@ class Node:
 
     @staticmethod
     def new(kind: NodeKind, statement: str, **meta: Any) -> "Node":
+        # Distinct prefixes: conjecture/concept both start with "con"
+        prefix = {
+            NodeKind.TARGET: "tgt",
+            NodeKind.CONJECTURE: "cj",
+            NodeKind.LEMMA: "lem",
+            NodeKind.PLAN: "pln",
+            NodeKind.GAP: "gap",
+            NodeKind.COUNTEREXAMPLE: "cex",
+            NodeKind.CONCEPT: "cpt",
+            NodeKind.ABDUCTION: "abd",
+        }.get(kind, kind.value[:3])
         return Node(
-            id=f"{kind.value[:3]}_{uuid.uuid4().hex[:10]}",
+            id=f"{prefix}_{uuid.uuid4().hex[:10]}",
             kind=kind,
             statement=statement,
             meta=meta,
@@ -78,11 +94,60 @@ class ResearchGraph:
         open_c = [
             n
             for n in self.nodes.values()
-            if n.kind in {NodeKind.CONJECTURE, NodeKind.TARGET, NodeKind.GAP}
-            and n.status in {NodeStatus.OPEN, NodeStatus.BLOCKED}
+            if n.kind
+            in {
+                NodeKind.CONJECTURE,
+                NodeKind.TARGET,
+                NodeKind.GAP,
+                NodeKind.CONCEPT,
+                NodeKind.ABDUCTION,
+            }
+            and n.status in {NodeStatus.OPEN, NodeStatus.BLOCKED, NodeStatus.HUMAN_REVIEW}
         ]
         open_c.sort(key=lambda n: -n.score)
         return open_c[:limit]
+
+    def conceptual_frontier(self, limit: int = 5) -> list[Node]:
+        """Prefer Concept/Abduction ranked by conceptual_value meta score."""
+        cands = [
+            n
+            for n in self.nodes.values()
+            if n.kind in {NodeKind.CONCEPT, NodeKind.ABDUCTION}
+            and n.status in {NodeStatus.OPEN, NodeStatus.HUMAN_REVIEW, NodeStatus.ACCEPTED}
+        ]
+
+        def _v(n: Node) -> float:
+            scores = (n.meta or {}).get("scores") or {}
+            return float(scores.get("conceptual_value", n.score))
+
+        cands.sort(key=_v, reverse=True)
+        return cands[:limit]
+
+    def admit_concept(
+        self,
+        statement: str,
+        *,
+        name: str = "",
+        closes_gap_ids: list[str] | None = None,
+        scores: dict[str, float] | None = None,
+        human_gate: bool = True,
+    ) -> Node:
+        node = Node.new(
+            NodeKind.CONCEPT,
+            statement,
+            name=name or statement[:60],
+            closes_gap_ids=closes_gap_ids or [],
+            scores=scores or {},
+            human_gate={"required": human_gate, "notes": ""},
+        )
+        if scores and "conceptual_value" in scores:
+            node.score = float(scores["conceptual_value"])
+        node.status = NodeStatus.HUMAN_REVIEW if human_gate else NodeStatus.OPEN
+        self.add(node)
+        for gid in closes_gap_ids or []:
+            if gid in self.nodes:
+                self.link(node.id, gid, "abstracts")
+        return node
 
     def admit_lemma(self, statement: str, certificate: str, parent_id: str | None = None) -> Node:
         node = Node.new(NodeKind.LEMMA, statement, source=parent_id)
