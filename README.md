@@ -1,10 +1,27 @@
-# MathAgent
+<div align="center">
 
-低资源 **AI-for-Math** 栈：从竞赛工具环（ToRA / MathChat）做到研究型 **MathLattice**，再到逼近「概念思维」的 **Think 三柱**（可执行库 · 假说竞技场 · 跨项目证据）。
+# MathAgent: Low-Resource AI for Mathematical Research Reasoning
+
+**Towards Lattice · Think · Formal — conceptual math agents under laptop budgets.**
+
+<img src="docs/assets/mathagent-banner.png" alt="MathAgent banner" width="720"/>
+
+<br/>
+
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](docs/README.md)
+[![tests](https://img.shields.io/badge/tests-pytest-orange.svg)](tests/)
+[![lean](https://img.shields.io/badge/Lean-4%20local-purple.svg)](docs/TRY_LOCAL_AND_MATHLIB.md)
+[![github](https://img.shields.io/badge/GitHub-mathagent-181717.svg)](https://github.com/hongwei-2026/mathagent)
+
+📖 [English](README_en.md) | [中文](README.md)
+
+</div>
+
+**MathAgent** 是一套面向数学推理的开源低资源智能体栈：从竞赛式 **工具环（ToRA / MathChat）**，到 **Formal / Econ** 廉价认证，再到研究型 **MathLattice** 图记忆，以及逼近概念思维的 **Think 三柱**（可执行库 · 假说竞技场 · 跨项目证据）。栈内复用 **SymPy / Lean / DeepSeek API**，并强调证书诚实——不把未验证叙事当成证明。
 
 > **诚实边界：** 不声称用一次 API 证明 Fields 级结果。本仓库最大化 *可认证的进展*，并把开放缺口写成显式 `Gap` / `HUMAN_REVIEW`。
-
-仓库：https://github.com/hongwei-2026/mathagent
 
 ---
 
@@ -22,7 +39,9 @@
 
 ## 四层能力（由浅入深）
 
-![MathAgent four-layer stack](docs/assets/stack-overview.svg)
+<div align="center">
+<img src="docs/assets/stack-overview.png" alt="MathAgent four-layer stack" width="900"/>
+</div>
 
 | 层 | CLI | 何时用 |
 |----|-----|--------|
@@ -89,7 +108,9 @@ mathagent lean-check --code "theorem t : True := trivial"
 
 竞赛 prover ≠ 研究数学。Lattice 吸收 Ansatz 图记忆、DreamProver wake/sleep、猜想优先形式化等，在笔记本预算上跑：
 
-![MathLattice wake/sleep loop](docs/assets/lattice-loop.svg)
+<div align="center">
+<img src="docs/assets/lattice-loop.png" alt="MathLattice wake/sleep loop" width="900"/>
+</div>
 
 ### Concept-value（A→E）
 
@@ -122,7 +143,9 @@ mathagent lattice-gate <project_id> <cpt_id> accept --note "keep hard core"
 
 **问题：** 只有纪律外壳时，Concept 仍是叙事 JSON——不能调用、不能淘汰、不能跨次复利。
 
-![Think three pillars](docs/assets/think-pillars.svg)
+<div align="center">
+<img src="docs/assets/think-pillars.png" alt="Think three pillars" width="900"/>
+</div>
 
 | 柱 | 前沿锚点 | 代码 | 硬约束 |
 |----|----------|------|--------|
@@ -193,19 +216,19 @@ mathagent eval --dataset gsm8k --limit 20 --out outputs/gsm8k_pred.jsonl
 
 ```text
 src/mathagent/
-  agent.py, prompts.py, tools/, eval/     # ① 工具 agent
-  formal/                                 # ② certify / econ / Lean / budget
+  agent.py, prompts.py, tools/, eval/     # 1 tool agent
+  formal/                                 # 2 certify / econ / Lean / budget
   lattice/
     graph.py  conjecture.py  wake.py  sleep.py
     abduction.py  analogy.py  value.py  mdl.py  causal.py  curator.py
     pipeline.py
-    think/                                # ④ 三柱
+    think/                                # 4 pillars
       executable.py  cheap_tests.py  arena.py  evidence.py  loop.py
   cli.py  ui_app.py  config.py
 
-docs/           架构与低成本路径
-tests/          pytest（含 concept-value / think pillars）
-lean_workspace/ lean_mathlib/   本地 Lean
+docs/           architecture docs + assets/
+tests/          pytest (concept-value / think pillars)
+lean_workspace/ lean_mathlib/   local Lean
 ```
 
 ### 主要 CLI
@@ -249,8 +272,6 @@ pytest -q
   year={2024}
 }
 ```
-
-DreamCoder / EconProver / 相关形式化工作见各文档内链接。
 
 ## License
 

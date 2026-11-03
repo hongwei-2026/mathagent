@@ -15,9 +15,12 @@
 
 | 图 | 文件 |
 |----|------|
-| 四层总览 | [assets/stack-overview.svg](assets/stack-overview.svg) |
-| Lattice wake/sleep | [assets/lattice-loop.svg](assets/lattice-loop.svg) |
-| Think 三柱 | [assets/think-pillars.svg](assets/think-pillars.svg) |
+| 品牌横幅 | [assets/mathagent-banner.png](assets/mathagent-banner.png) |
+| 四层总览 | [assets/stack-overview.png](assets/stack-overview.png) |
+| Lattice wake/sleep | [assets/lattice-loop.png](assets/lattice-loop.png) |
+| Think 三柱 | [assets/think-pillars.png](assets/think-pillars.png) |
+
+重新生成架构 PNG：`python scripts/render_readme_assets.py`
 
 ## 模块 ↔ 文档速查
 
