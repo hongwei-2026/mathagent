@@ -22,12 +22,7 @@
 
 ## 四层能力（由浅入深）
 
-```text
-① Tool Agent          解题环：LLM ↔ SymPy/Python 工具（竞赛/作业）
-② Formal / Econ       分解 + 廉价认证 + 按失败升级（低成本证明）
-③ MathLattice         研究图：猜想池 · Gap · Concept · wake/sleep
-④ Think pillars       概念必须可调用、可淘汰、可跨 run 记账
-```
+![MathAgent four-layer stack](docs/assets/stack-overview.svg)
 
 | 层 | CLI | 何时用 |
 |----|-----|--------|
@@ -94,11 +89,7 @@ mathagent lean-check --code "theorem t : True := trivial"
 
 竞赛 prover ≠ 研究数学。Lattice 吸收 Ansatz 图记忆、DreamProver wake/sleep、猜想优先形式化等，在笔记本预算上跑：
 
-```text
-conjecture pool → typed graph (Target/Conjecture/Lemma/Gap/Concept)
-       → wake(econ/Lean/SymPy) → sleep(library_ops，非假 lemma)
-       → curator / human gate
-```
+![MathLattice wake/sleep loop](docs/assets/lattice-loop.svg)
 
 ### Concept-value（A→E）
 
@@ -131,18 +122,13 @@ mathagent lattice-gate <project_id> <cpt_id> accept --note "keep hard core"
 
 **问题：** 只有纪律外壳时，Concept 仍是叙事 JSON——不能调用、不能淘汰、不能跨次复利。
 
+![Think three pillars](docs/assets/think-pillars.svg)
+
 | 柱 | 前沿锚点 | 代码 | 硬约束 |
 |----|----------|------|--------|
 | **1 可执行库** | DreamCoder：wake 必须 *call* 原语 | `lattice/think/executable.py` | `from_concept` 叶优先 `call_op`；空 hint 不能 manual-proved |
 | **2 假说竞技场** | Robot Scientist / Lakatos | `cheap_tests.py` + `arena.py` | 同 gap 多 Concept → 廉价否证 → 败者 `REJECTED` |
 | **3 证据账本** | CoEvo / LeanAgent lifelong | `think/evidence.py` | `data/lattice/evidence.jsonl`；Δ`graph_dl`；历史负 MDL 降权 |
-
-```text
-start: 证据先验 → 可调用概念才 spawn 叶
-wake:  叶 → call_op（柱1）
-mid:   cheap 否证 → arena 淘汰（柱2）
-end:   写 Δgraph_dl 证据（柱3）
-```
 
 ```bash
 mathagent lattice "Compress (a+b)^2 via a reusable macro, not term-churn" \

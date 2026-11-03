@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 460" width="920" height="460" role="img" aria-label="Think three pillars">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#93c5fd"/>
+    </marker>
+  </defs>
+  <rect width="920" height="460" rx="12" fill="#0f1419"/>
+  <text x="40" y="40" fill="#e8eef5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="600">Think  three pillars</text>
+  <text x="40" y="64" fill="#8b9bb0" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">callable · killable · accountable across runs</text>
+
+  <!-- pillar 1 -->
+  <rect x="40" y="100" width="260" height="220" rx="12" fill="#1a2e24" stroke="#86efac" stroke-width="2"/>
+  <text x="170" y="140" text-anchor="middle" fill="#86efac" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="700">1</text>
+  <text x="170" y="168" text-anchor="middle" fill="#e8eef5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Executable library</text>
+  <text x="170" y="200" text-anchor="middle" fill="#c5d0dc" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">DreamCoder-style</text>
+  <text x="170" y="230" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">{{a}} templates</text>
+  <text x="170" y="252" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">wake ’ call_op</text>
+  <text x="170" y="274" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">invoke telemetry</text>
+
+  <!-- pillar 2 -->
+  <rect x="330" y="100" width="260" height="220" rx="12" fill="#2a2430" stroke="#fcd34d" stroke-width="2"/>
+  <text x="460" y="140" text-anchor="middle" fill="#fcd34d" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="700">2</text>
+  <text x="460" y="168" text-anchor="middle" fill="#e8eef5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Hypothesis arena</text>
+  <text x="460" y="200" text-anchor="middle" fill="#c5d0dc" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">Lakatos / IBE</text>
+  <text x="460" y="230" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">cheap discriminators</text>
+  <text x="460" y="252" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">same-gap rivals</text>
+  <text x="460" y="274" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">REJECTED losers</text>
+
+  <!-- pillar 3 -->
+  <rect x="620" y="100" width="260" height="220" rx="12" fill="#1a2838" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="750" y="140" text-anchor="middle" fill="#7dd3fc" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="700">3</text>
+  <text x="750" y="168" text-anchor="middle" fill="#e8eef5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Evidence ledger</text>
+  <text x="750" y="200" text-anchor="middle" fill="#c5d0dc" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">CoEvo / lifelong</text>
+  <text x="750" y="230" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">evidence.jsonl</text>
+  <text x="750" y="252" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">” graph_dl</text>
+  <text x="750" y="274" text-anchor="middle" fill="#a8b8c8" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">boost / demote</text>
+
+  <!-- cycle arrows bottom -->
+  <rect x="40" y="360" width="840" height="70" rx="10" fill="#1a2332" stroke="#3d5a73"/>
+  <text x="460" y="390" text-anchor="middle" fill="#e8eef5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="600">run cycle</text>
+  <text x="460" y="415" text-anchor="middle" fill="#8b9bb0" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">start (priors) ’ wake (call_op) ’ mid (cheap + arena) ’ end (”dl ledger)</text>
+</svg>

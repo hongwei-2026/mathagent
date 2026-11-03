@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 420" width="920" height="420" role="img" aria-label="MathAgent four-layer stack">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1419"/>
+      <stop offset="100%" stop-color="#1a2332"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="920" height="420" rx="12" fill="url(#bg)"/>
+  <text x="40" y="42" fill="#e8eef5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="600">MathAgent  four layers</text>
+  <text x="40" y="68" fill="#8b9bb0" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">tool solve ’ formal/econ ’ research lattice ’ think pillars</text>
+
+  <!-- layer boxes -->
+  <g filter="url(#shadow)" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <rect x="40" y="100" width="840" height="64" rx="10" fill="#243447" stroke="#3d5a73"/>
+    <text x="60" y="128" fill="#7dd3fc" font-size="14" font-weight="600">` Tool Agent</text>
+    <text x="60" y="150" fill="#c5d0dc" font-size="13">LLM ” SymPy / sandboxed Python · ToRA / MathChat · solve / eval</text>
+
+    <rect x="40" y="180" width="840" height="64" rx="10" fill="#243447" stroke="#3d5a73"/>
+    <text x="60" y="208" fill="#86efac" font-size="14" font-weight="600">a Formal / Econ</text>
+    <text x="60" y="230" fill="#c5d0dc" font-size="13">cheap certify ’ repair ’ decompose ’ escalate · Lean on D: · formal / econ</text>
+
+    <rect x="40" y="260" width="840" height="64" rx="10" fill="#243447" stroke="#3d5a73"/>
+    <text x="60" y="288" fill="#fcd34d" font-size="14" font-weight="600">b MathLattice</text>
+    <text x="60" y="310" fill="#c5d0dc" font-size="13">typed graph · abduction A’E · MDL · library sleep · lattice / lattice-gate</text>
+
+    <rect x="40" y="340" width="840" height="54" rx="10" fill="#2a3f55" stroke="#5b8def"/>
+    <text x="60" y="365" fill="#93c5fd" font-size="14" font-weight="600">c Think pillars</text>
+    <text x="60" y="385" fill="#c5d0dc" font-size="13">executable library · hypothesis arena · evidence ledger · --think</text>
+  </g>
+</svg>

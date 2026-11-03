@@ -11,6 +11,14 @@
 
 仓库总览与 CLI 速查：根目录 [README.md](../README.md)。
 
+### 架构图（README 插图）
+
+| 图 | 文件 |
+|----|------|
+| 四层总览 | [assets/stack-overview.svg](assets/stack-overview.svg) |
+| Lattice wake/sleep | [assets/lattice-loop.svg](assets/lattice-loop.svg) |
+| Think 三柱 | [assets/think-pillars.svg](assets/think-pillars.svg) |
+
 ## 模块 ↔ 文档速查
 
 | 代码 | 文档段落 |
