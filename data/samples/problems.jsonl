@@ -1,0 +1,15 @@
+{"id": "arith-1", "problem": "What is 17 * 19 + 23?", "answer": "346", "source": "synthetic", "level": "easy"}
+{"id": "arith-2", "problem": "Compute (3/4) / (5/6).", "answer": "9/10", "source": "synthetic", "level": "easy"}
+{"id": "alg-1", "problem": "Solve for x: 2x + 5 = 17.", "answer": "6", "source": "synthetic", "level": "easy"}
+{"id": "alg-2", "problem": "Solve the system: x + y = 10 and x - y = 2. What is the value of x?", "answer": "6", "source": "synthetic", "level": "easy"}
+{"id": "alg-3", "problem": "Find all real solutions of x^2 - 5x + 6 = 0. List them in increasing order separated by comma.", "answer": "2, 3", "source": "synthetic", "level": "easy"}
+{"id": "gsm8k-style-1", "problem": "Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May?", "answer": "72", "source": "gsm8k-style", "level": "easy"}
+{"id": "gsm8k-style-2", "problem": "Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?", "answer": "10", "source": "gsm8k-style", "level": "easy"}
+{"id": "calc-1", "problem": "Differentiate f(x) = x^3 + 2x with respect to x, then evaluate f'(2).", "answer": "14", "source": "synthetic", "level": "medium"}
+{"id": "calc-2", "problem": "Compute the definite integral of 2x from 0 to 3.", "answer": "9", "source": "synthetic", "level": "medium"}
+{"id": "numtheory-1", "problem": "What is gcd(252, 105)?", "answer": "21", "source": "synthetic", "level": "easy"}
+{"id": "combo-1", "problem": "How many ways can you choose 3 items from 10 distinct items? (binomial coefficient)", "answer": "120", "source": "synthetic", "level": "medium"}
+{"id": "math-style-1", "problem": "Simplify (x^2 - 4)/(x - 2) for x != 2.", "answer": "x + 2", "source": "math-style", "level": "easy"}
+{"id": "math-style-2", "problem": "If f(x) = 3x - 1 and g(x) = x^2, what is (g ◦ f)(2)?", "answer": "25", "source": "math-style", "level": "easy"}
+{"id": "word-1", "problem": "A rectangle has length 12 and width 5. What is its area?", "answer": "60", "source": "synthetic", "level": "easy"}
+{"id": "word-2", "problem": "Tom has 3 times as many apples as Jerry. Together they have 48 apples. How many apples does Tom have?", "answer": "36", "source": "synthetic", "level": "easy"}
