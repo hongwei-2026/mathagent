@@ -75,6 +75,7 @@ def test_evidence_ledger_roundtrip(tmp_path):
     path = Path(tmp_path) / "evidence.jsonl"
     ledger = EvidenceLedger(path=path)
     g = ResearchGraph(project_id="ev")
+    g.meta["graph_dl_start"] = 100.0
     c = g.admit_concept(
         "hist",
         name="binomial_square",
@@ -83,8 +84,9 @@ def test_evidence_ledger_roundtrip(tmp_path):
     )
     c.status = NodeStatus.ACCEPTED
     c.meta["arena_win"] = {"arena": "x"}
-    recs = ledger.commit_graph(g)
+    recs = ledger.commit_graph(g, graph_dl_before=100.0)
     assert len(recs) == 1
+    assert recs[0].delta_graph_dl != 0 or recs[0].graph_dl_before == 100.0
     assert path.exists()
     assert ledger.prior_boost("binomial_square") > 0
     g2 = ResearchGraph(project_id="ev2")
@@ -92,3 +94,32 @@ def test_evidence_ledger_roundtrip(tmp_path):
     n = apply_evidence_priors(g2, ledger)
     assert n == 1
     assert c2.meta["scores"]["conceptual_value"] > 0.5
+
+
+def test_cheap_tests_kill_all_fail_hypothesis():
+    from mathagent.lattice.think.cheap_tests import run_cheap_discriminators
+
+    g = ResearchGraph(project_id="ct")
+    gap = g.add_gap("shared")
+    good = g.admit_concept(
+        "good",
+        name="good",
+        closes_gap_ids=[gap.id],
+        human_gate=False,
+    )
+    good.meta["predicted_leaf_checks"] = [
+        {"statement": "sq", "sympy_hint": "(a-b)**2"}
+    ]
+    bad = g.admit_concept(
+        "bad",
+        name="bad",
+        closes_gap_ids=[gap.id],
+        human_gate=False,
+    )
+    bad.meta["predicted_leaf_checks"] = [
+        {"statement": "bogus", "sympy_hint": "this_is_not_valid_sympy@@@"}
+    ]
+    reps = run_cheap_discriminators(g)
+    assert reps
+    assert bad.status == NodeStatus.REJECTED
+    assert good.status in {NodeStatus.ACCEPTED, NodeStatus.OPEN}

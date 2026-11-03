@@ -122,6 +122,11 @@ def call_op(
         hint = rendered
 
     res: CertificateResult = certify_algebraic_claim(hint, statement=statement or concept.statement)
+    tel = dict(concept.meta.get("telemetry") or {})
+    tel["invoke_count"] = int(tel.get("invoke_count", 0)) + 1
+    if res.ok:
+        tel["invoke_success_count"] = int(tel.get("invoke_success_count", 0)) + 1
+    concept.meta["telemetry"] = tel
     return CallResult(
         res.ok, res.method, res.detail, rendered=hint, op_name=name, binding=binding
     )

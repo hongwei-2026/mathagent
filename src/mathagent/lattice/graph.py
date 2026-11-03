@@ -79,6 +79,7 @@ class ResearchGraph:
     project_id: str
     nodes: dict[str, Node] = field(default_factory=dict)
     edges: list[Edge] = field(default_factory=list)
+    meta: dict[str, Any] = field(default_factory=dict)
 
     def add(self, node: Node) -> Node:
         self.nodes[node.id] = node
@@ -180,12 +181,13 @@ class ResearchGraph:
             "project_id": self.project_id,
             "nodes": [asdict(n) | {"kind": n.kind.value, "status": n.status.value} for n in self.nodes.values()],
             "edges": [asdict(e) for e in self.edges],
+            "meta": self.meta,
             "summary": self.summary(),
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ResearchGraph":
-        g = cls(project_id=data["project_id"])
+        g = cls(project_id=data["project_id"], meta=dict(data.get("meta") or {}))
         for raw in data.get("nodes", []):
             g.nodes[raw["id"]] = Node(
                 id=raw["id"],

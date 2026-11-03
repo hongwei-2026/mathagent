@@ -32,6 +32,9 @@ class EvidenceRecord:
     n_certified: int
     n_blocked: int
     graph_dl: float
+    graph_dl_before: float = 0.0
+    delta_graph_dl: float = 0.0
+    event: str = "graph_dl_snapshot"
     arena_win: bool = False
     library_calls_ok: int = 0
     tags: dict[str, Any] = field(default_factory=dict)
@@ -80,23 +83,38 @@ class EvidenceLedger:
         return agg
 
     def prior_boost(self, name: str) -> float:
-        """[0, 0.25] additive boost to conceptual_value from history."""
+        """Additive delta in [-0.2, 0.25] from history (demotes chronic negative MDL)."""
         stats = self.name_stats().get(name)
         if not stats or stats["n"] < 1:
             return 0.0
-        return min(0.25, 0.1 * stats["win_rate"] + 0.1 * stats["mean_p"] + 0.05 * (1 if stats["mean_mdl"] > 0 else 0))
+        boost = 0.1 * stats["win_rate"] + 0.1 * stats["mean_p"]
+        if stats["mean_mdl"] > 0:
+            boost += 0.05
+        elif stats["mean_mdl"] < 0:
+            boost -= 0.15  # continual_value demotion
+        return max(-0.2, min(0.25, boost))
 
-    def commit_graph(self, graph: ResearchGraph) -> list[EvidenceRecord]:
+    def commit_graph(
+        self, graph: ResearchGraph, *, graph_dl_before: float | None = None
+    ) -> list[EvidenceRecord]:
         dl = graph_dl(graph)
+        dl0 = float(graph_dl_before if graph_dl_before is not None else graph.meta.get("graph_dl_start", dl))
+        delta = dl0 - dl  # positive => compressed
         now = datetime.now(timezone.utc).isoformat()
         out: list[EvidenceRecord] = []
         for c in graph.by_kind(NodeKind.CONCEPT):
             scores = c.meta.get("scores") or {}
             stats = leaf_outcomes_for_concept(graph, c.id)
             calls = 0
+            tel_ok = int((c.meta.get("telemetry") or {}).get("invoke_success_count", 0))
             for n in graph.nodes.values():
                 if n.meta.get("from_concept") == c.id and n.meta.get("library_call"):
                     calls += 1
+            event = "hypothesis_accepted" if c.status == NodeStatus.ACCEPTED else "graph_dl_snapshot"
+            if c.meta.get("arena_win"):
+                event = "hypothesis_accepted"
+            if c.status == NodeStatus.REJECTED:
+                event = "hypothesis_eliminated"
             rec = EvidenceRecord(
                 ts=now,
                 project_id=graph.project_id,
@@ -110,8 +128,12 @@ class EvidenceLedger:
                 n_certified=stats["n_certified"],
                 n_blocked=stats["n_blocked"],
                 graph_dl=dl,
+                graph_dl_before=dl0,
+                delta_graph_dl=delta,
+                event=event,
                 arena_win=bool(c.meta.get("arena_win")),
-                library_calls_ok=calls,
+                library_calls_ok=max(calls, tel_ok),
+                tags={"telemetry": c.meta.get("telemetry") or {}},
             )
             self.append(rec)
             out.append(rec)
@@ -119,20 +141,20 @@ class EvidenceLedger:
 
 
 def apply_evidence_priors(graph: ResearchGraph, ledger: EvidenceLedger | None = None) -> int:
-    """Boost conceptual_value of concepts whose names won historically."""
+    """Boost or demote conceptual_value from cross-run ledger (continual value)."""
     ledger = ledger or EvidenceLedger()
     n = 0
     for c in graph.by_kind(NodeKind.CONCEPT):
         if c.status == NodeStatus.REJECTED:
             continue
         name = str(c.meta.get("name") or "")
-        boost = ledger.prior_boost(name)
-        if boost <= 0:
+        delta = ledger.prior_boost(name)
+        if abs(delta) < 1e-9:
             continue
         scores = dict(c.meta.get("scores") or {})
         v = float(scores.get("conceptual_value", c.score))
-        scores["conceptual_value"] = min(1.0, v + boost)
-        scores["evidence_boost"] = boost
+        scores["conceptual_value"] = max(0.0, min(1.0, v + delta))
+        scores["evidence_boost"] = delta
         c.meta["scores"] = scores
         c.score = scores["conceptual_value"]
         n += 1

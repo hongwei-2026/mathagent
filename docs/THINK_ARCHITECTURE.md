@@ -8,11 +8,15 @@ value scores did not accumulate across projects.
 
 ## Frontier anchors
 
-| Pillar | Systems / ideas taken |
-|--------|------------------------|
-| **1 Executable library** | DreamCoder wake–sleep (Ellis et al. 2023): abstractions must be *callable primitives*; LILO / decompile amortized knowledge; theorem-discovery agents that add theorems as *actions* |
-| **2 Hypothesis competition** | Lakatos SRP (hard core + protective belt); IBE / competing hypotheses (not always exclusive); abduction-as-belief-revision |
-| **3 Cross-run evidence** | CoEvo knowledge library; LeanAgent lifelong DB; Mathscape compression reward; Robot Scientist closed loops |
+| System | Takeaway | Pillar |
+|--------|----------|--------|
+| DreamCoder | Wake **calls** library primitives; sleep compresses solutions | 1 |
+| LILO / Stitch | Libraries must be invokable + compressible | 1 |
+| Robot Scientist / Eve | Competing hypotheses → cheapest discriminating experiment | 2 |
+| BACON / Lakatos | Theory revision; progressive vs degenerating programmes | 2 |
+| Peirce / HALO | Abduction has a **price** (opened gaps + axioms) | 2 |
+| CoEvo / LeanAgent / Mathscape | Continual library + compression attribution across runs | 3 |
+| Ansatz / Aria | Typed graph / concept DAG as durable theory memory | 3 |
 
 ## Loop
 
@@ -33,10 +37,11 @@ value scores did not accumulate across projects.
 
 | File | Responsibility |
 |------|----------------|
-| `lattice/think/executable.py` | Instantiate `{{param}}` SymPy/Lean templates; `call_op` must succeed or refute |
-| `lattice/think/arena.py` | Group concepts by shared gaps; score; `REJECTED` losers |
-| `lattice/think/evidence.py` | Append-only ledger under `data/lattice/evidence.jsonl` |
-| `lattice/think/loop.py` | Orchestrate think cycle after concept-value admit |
+| `lattice/think/executable.py` | Instantiate `{{param}}` templates; `call_op` + invoke telemetry |
+| `lattice/think/cheap_tests.py` | Discriminating sympy/call_op tests; kill all-fail hypotheses |
+| `lattice/think/arena.py` | Group by shared gaps; fitness elimination after cheap tests |
+| `lattice/think/evidence.py` | JSONL ledger with `delta_graph_dl`; boost/demote priors |
+| `lattice/think/loop.py` | start → mid (cheap+arena) → end (Δdl commit) |
 
 ## Acceptance (minimal)
 
