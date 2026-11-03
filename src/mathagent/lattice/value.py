@@ -1,9 +1,11 @@
-"""Conceptual-value rubrics (compression / minimality / systematicity / surprise)."""
+"""Conceptual-value rubrics (MDL compression / minimality / systematicity / surprise)."""
 
 from __future__ import annotations
 
 import math
 from typing import Any
+
+from mathagent.lattice.mdl import score_with_mdl
 
 
 DEFAULT_WEIGHTS = {
@@ -19,6 +21,7 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
 
 
 def compression_score(gaps_closed: int, gaps_opened: int, edge_reduction: float = 0.0) -> float:
+    """Legacy heuristic (gap counts). Prefer MDL blend via score_proposal."""
     return _clamp((gaps_closed + 0.5 * edge_reduction) / (1.0 + gaps_opened + 1e-6))
 
 
@@ -45,7 +48,7 @@ def conceptual_value(scores: dict[str, float], weights: dict[str, float] | None 
 
 
 def score_proposal(raw: dict[str, Any]) -> dict[str, float]:
-    """Fill rubric scores from an abduction/concept JSON blob."""
+    """Fill rubric scores from an abduction/concept JSON blob (MDL-blended compression)."""
     closes = raw.get("closes_gap_ids") or raw.get("predicted_effects", {}).get("gaps_closed") or []
     opens = raw.get("opens_gap_ids") or []
     axioms = raw.get("axiom_ask") or []
@@ -57,13 +60,19 @@ def score_proposal(raw: dict[str, Any]) -> dict[str, float]:
     )
     belief = raw.get("belief") or {}
     p0 = float(belief.get("p_before", 0.3))
-    p1 = float(belief.get("p_after", 0.5))
+    p1 = float(belief.get("p_after", belief.get("p_posterior", 0.5)))
+
+    heur = compression_score(len(closes), len(opens))
+    blended, mdl_meta = score_with_mdl(raw, heur)
 
     scores = {
-        "compression": compression_score(len(closes), len(opens)),
+        "compression": blended,
+        "compression_heuristic": heur,
         "minimality": minimality_score(len(axioms), int(raw.get("baseline_asks", 0) or 0)),
         "systematicity": systematicity_score(verified, max(len(analogies), 1)),
         "surprise": surprise_score(p0, p1),
+        "mdl_gain": float(mdl_meta["mdl_gain"]),
+        "mdl_compression": float(mdl_meta["mdl_compression"]),
     }
     scores["conceptual_value"] = conceptual_value(scores)
     return scores
@@ -73,6 +82,9 @@ def needs_human_gate(scores: dict[str, float], axiom_asks: int = 0) -> bool:
     if scores.get("systematicity", 0) < 0.5:
         return True
     if axiom_asks > 2:
+        return True
+    # Negative MDL gain → always review (theory got longer)
+    if scores.get("mdl_gain", 0) < 0:
         return True
     if scores.get("surprise", 0) > 0.7 and scores.get("compression", 0) < 0.4:
         return True

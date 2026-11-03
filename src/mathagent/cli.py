@@ -203,6 +203,7 @@ def lattice(
             f"graph={result.graph_summary}\n"
             f"lemmas={len(result.certified_lemmas)} gaps={len(result.gaps)} "
             f"concepts={len(result.concepts)}\n"
+            f"graph_dl={result.graph_dl:.1f} causal={len(result.causal)}\n"
             f"human_review={result.human_review_queue}\n"
             f"saved={result.graph_path}",
             title="MathLattice",
@@ -231,6 +232,8 @@ def lattice(
             "concepts": result.concepts,
             "curator": result.curator,
             "human_review_queue": result.human_review_queue,
+            "causal": result.causal,
+            "graph_dl": result.graph_dl,
             "certified_lemmas": result.certified_lemmas,
             "gaps": result.gaps,
             "sleep": result.sleep,

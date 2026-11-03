@@ -3,9 +3,9 @@ MathLattice pipeline — Fields-oriented research architecture on a laptop budge
 
 Default: conjecture pool → typed graph → wake (econ/certify) → sleep → curator.
 
-Concept-value mode (A→E):
-  A abduction → B concept slots → C analogy maps (+ refresh gate) →
-  E human co-abduction gate → D curator spawn/rank → wake only ACCEPTED/OPEN concept leaves.
+Concept-value mode (A→E + paradigm layer):
+  A abduction → B concept slots → C analogy → E gate → D curator → wake leaves
+  + MDL compression scoring + DreamCoder library sleep + causal surprise after wake.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from mathagent.formal.budget import Budget
 from mathagent.formal.econ import EconEngine
 from mathagent.lattice.abduction import run_abduction
 from mathagent.lattice.analogy import enrich_concepts_with_analogy_checks
+from mathagent.lattice.causal import apply_causal_surprise
 from mathagent.lattice.conjecture import generate_conjecture_pool
 from mathagent.lattice.curator import (
     curator_report,
@@ -28,6 +29,7 @@ from mathagent.lattice.curator import (
     wake_frontier,
 )
 from mathagent.lattice.graph import GraphStore, Node, NodeKind, NodeStatus, ResearchGraph
+from mathagent.lattice.mdl import graph_dl
 from mathagent.lattice.sleep import sleep_consolidate
 from mathagent.lattice.wake import WakeOutcome, wake_attempt
 
@@ -46,6 +48,8 @@ class LatticeResult:
     concepts: list[dict[str, Any]] = field(default_factory=list)
     curator: dict[str, Any] = field(default_factory=dict)
     human_review_queue: list[str] = field(default_factory=list)
+    causal: list[dict[str, Any]] = field(default_factory=list)
+    graph_dl: float = 0.0
     verdict: str = ""
     graph_path: str = ""
     budget: Budget | None = None
@@ -180,8 +184,25 @@ class LatticePipeline:
                     )
                 )
             sleep_data = sleep_consolidate(
-                graph, client=self.client, settings=self.settings, on_event=self.on_event
+                graph,
+                client=self.client,
+                settings=self.settings,
+                on_event=self.on_event,
+                library_learning=True,
             )
+            if self.concept_value and self.auto_accept_concepts:
+                for n in graph.by_kind(NodeKind.CONCEPT):
+                    if n.status == NodeStatus.HUMAN_REVIEW and n.meta.get("from_sleep"):
+                        n.status = NodeStatus.ACCEPTED
+                spawned2 = spawn_leaf_conjectures_from_concepts(graph)
+                if spawned2:
+                    self.on_event(f"[lattice/curator] sleep-library leaves={len(spawned2)}")
+
+        causal_reports: list[dict[str, Any]] = []
+        if self.concept_value:
+            causal_reports = apply_causal_surprise(graph)
+            if causal_reports:
+                self.on_event(f"[lattice/causal] updated surprise on {len(causal_reports)} concepts")
 
         path = self.store.save(graph)
         lemmas = [
@@ -239,6 +260,8 @@ class LatticePipeline:
             concepts=concept_blobs,
             curator=report,
             human_review_queue=list(human_q),
+            causal=causal_reports,
+            graph_dl=graph_dl(graph),
             verdict=verdict,
             graph_path=str(path),
             budget=self.budget,

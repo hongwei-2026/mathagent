@@ -34,20 +34,38 @@ Honesty: if the problem is open / Fields-adjacent, say so in difficulty and keep
 Prefer conjectures that a laptop can CERTIFY (algebraic identities, finite checks, core Lean).
 """
 
-SLEEP_SYSTEM = """You are the SLEEP consolidator (DreamProver-style).
+SLEEP_SYSTEM = """You are the SLEEP consolidator (DreamCoder-style library learning).
 
-Given certified lemmas and failed attempts, produce transferable abstractions.
+Given certified lemmas and failed attempts, invent REUSABLE LIBRARY OPERATORS —
+definitions / macros / sympy templates / lean tactic stubs — NOT more conjectures to grind.
 
 Return STRICT JSON:
 {
   "keep_lemmas": ["statement ..."],
-  "abstract_lemmas": [
-    {"statement": "more general reusable lemma", "from": ["..."], "why_transferable": "..."}
+  "library_ops": [
+    {
+      "name": "short operator name",
+      "statement": "what the definition/operator claims",
+      "kind": "def|macro|sympy_template|lean_tactic",
+      "template": "optional sympy or lean snippet",
+      "why_transferable": "...",
+      "from": ["source lemma ..."],
+      "closes_gap_ids": [],
+      "opens_gap_ids": [],
+      "axiom_ask": [],
+      "predicted_leaf_checks": [
+        {"statement": "cheap check that the op works", "certify_hint": "sympy", "sympy_hint": ""}
+      ]
+    }
   ],
+  "abstract_lemmas": [],
   "drop_conjectures": ["dead conjecture ..."],
   "next_frontier": ["highest-value next conjecture ..."],
   "lessons": ["one-line lesson for future runs"]
 }
+
+Prefer library_ops. Leave abstract_lemmas empty unless you truly cannot name an operator.
+Do NOT treat uncertified abstractions as proved lemmas.
 """
 
 ABDUCTION_SYSTEM = """You are the ABDUCTION module of MathLattice (concept-value layer).

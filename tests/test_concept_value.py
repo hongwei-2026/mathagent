@@ -99,3 +99,64 @@ def test_empty_hint_does_not_manual_prove():
         {"status": "proved"},
     )
     assert not res.ok
+
+
+def test_mdl_gain_positive_when_closing_gaps():
+    from mathagent.lattice.mdl import concept_mdl_gain, graph_dl, mdl_compression_score
+
+    gain = concept_mdl_gain(
+        gaps_closed=3,
+        gaps_opened=0,
+        axiom_asks=0,
+        concept_statement="short def",
+    )
+    assert gain > 0
+    assert mdl_compression_score(gain) > 0.5
+    g = ResearchGraph(project_id="mdl")
+    g.add_gap("g1")
+    assert graph_dl(g) > 0
+
+
+def test_negative_mdl_triggers_gate():
+    prop = {
+        "statement": "x" * 200,
+        "closes_gap_ids": [],
+        "opens_gap_ids": ["o1", "o2"],
+        "axiom_ask": [{"id": "A1"}, {"id": "A2"}, {"id": "A3"}],
+        "analogies": [{"check_status": "sympy"}],
+        "belief": {"p_before": 0.4, "p_after": 0.41},
+    }
+    scores = score_proposal(prop)
+    assert scores["mdl_gain"] < 0
+    assert needs_human_gate(scores, axiom_asks=3) is True
+
+
+def test_causal_surprise_from_leaves():
+    from mathagent.lattice.causal import apply_causal_surprise
+    from mathagent.lattice.graph import Node
+
+    g = ResearchGraph(project_id="causal")
+    c = g.admit_concept(
+        "C",
+        name="C",
+        scores={"compression": 0.5, "minimality": 0.5, "systematicity": 0.5, "surprise": 0.2},
+        human_gate=False,
+    )
+    c.meta["belief"] = {"p_before": 0.2, "p_after": 0.8}
+    c.meta["scores"] = {
+        "compression": 0.5,
+        "minimality": 0.5,
+        "systematicity": 0.5,
+        "surprise": 0.2,
+        "conceptual_value": 0.4,
+    }
+    leaf = Node.new(NodeKind.CONJECTURE, "leaf", from_concept=c.id)
+    leaf.status = NodeStatus.CERTIFIED
+    g.add(leaf)
+    leaf2 = Node.new(NodeKind.CONJECTURE, "leaf2", from_concept=c.id)
+    leaf2.status = NodeStatus.BLOCKED
+    g.add(leaf2)
+    reps = apply_causal_surprise(g)
+    assert reps
+    assert c.meta["belief"]["p_empirical"] == 0.5
+    assert "surprise_llm" in c.meta["scores"]

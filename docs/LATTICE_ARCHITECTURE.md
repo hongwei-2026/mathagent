@@ -64,6 +64,14 @@ mathagent lattice-gate <project> <concept_id> accept --note "..."
 
 High `conceptual_value` without verified analogy maps stays `HUMAN_REVIEW`.
 
+## Paradigm layer (MDL / library sleep / causal surprise)
+
+| Piece | Module | Role |
+|---|---|---|
+| **MDL compression** | `lattice/mdl.py` | Concept V uses bit-gain (close gaps − def − axioms − new gaps), not only gap counts |
+| **Library sleep** | `lattice/sleep.py` | Sleep emits gated `library_ops` as Concepts — never high-score uncertified conjectures |
+| **Causal surprise** | `lattice/causal.py` | After wake, `do(concept)` → empirical leaf certify rate updates surprise |
+
 ## Admission rule (resource honesty)
 
 Only nodes with a **certificate** enter as `Lemma`:
