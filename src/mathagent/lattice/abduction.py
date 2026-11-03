@@ -65,7 +65,7 @@ def run_abduction(
                         closes.append(gid)
                         break
         prop["closes_gap_ids"] = list(dict.fromkeys(closes))
-        scores = score_proposal(prop)
+        scores = score_proposal(prop, graph=graph)
         prop["scores"] = scores
         prop["human_gate_required"] = needs_human_gate(scores, len(prop.get("axiom_ask") or []))
         concept = graph.admit_concept(
@@ -75,6 +75,7 @@ def run_abduction(
             scores=scores,
             human_gate=prop["human_gate_required"],
         )
+        concept.meta["origin"] = "abduction"
         concept.meta["why_old_language_fails"] = prop.get("why_old_language_fails", "")
         concept.meta["axiom_ask"] = prop.get("axiom_ask") or []
         concept.meta["analogies"] = prop.get("analogies") or []

@@ -113,8 +113,49 @@ def test_mdl_gain_positive_when_closing_gaps():
     assert gain > 0
     assert mdl_compression_score(gain) > 0.5
     g = ResearchGraph(project_id="mdl")
-    g.add_gap("g1")
-    assert graph_dl(g) > 0
+    gap = g.add_gap("expensive unexplained gap about X")
+    dl0 = graph_dl(g)
+    assert dl0 > 0
+    # Graph-aware: closing the real active gap credits its obligation
+    gain2 = concept_mdl_gain(
+        graph=g,
+        closes_gap_ids=[gap.id],
+        opens_gap_ids=[],
+        axiom_ask=[],
+        concept_statement="def",
+    )
+    assert gain2 > 0
+
+
+def test_library_op_requires_leaves_and_classic_silent():
+    from mathagent.lattice.sleep import admit_library_op
+
+    g = ResearchGraph(project_id="lib")
+    assert (
+        admit_library_op(
+            g, {"name": "x", "statement": "op without leaves", "from": ["L1"]}
+        )
+        is None
+    )
+    node = admit_library_op(
+        g,
+        {
+            "name": "binom",
+            "statement": "(a+b)^2 identity schema",
+            "from": ["lem"],
+            "predicted_leaf_checks": [
+                {
+                    "statement": "(x+y)**2 = x**2+2*x*y+y**2",
+                    "certify_hint": "sympy",
+                    "sympy_hint": "(x+y)**2 = x**2 + 2*x*y + y**2",
+                }
+            ],
+        },
+    )
+    assert node is not None
+    assert node.meta.get("origin") == "sleep"
+    assert node.status == NodeStatus.HUMAN_REVIEW
+    assert len(g.by_kind(NodeKind.CONCEPT)) == 1
 
 
 def test_negative_mdl_triggers_gate():

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Optional
 
 from mathagent.lattice.mdl import score_with_mdl
 
@@ -47,7 +47,7 @@ def conceptual_value(scores: dict[str, float], weights: dict[str, float] | None 
     return _clamp(sum(w[k] * float(scores.get(k, 0.0)) for k in w))
 
 
-def score_proposal(raw: dict[str, Any]) -> dict[str, float]:
+def score_proposal(raw: dict[str, Any], graph: Optional[Any] = None) -> dict[str, float]:
     """Fill rubric scores from an abduction/concept JSON blob (MDL-blended compression)."""
     closes = raw.get("closes_gap_ids") or raw.get("predicted_effects", {}).get("gaps_closed") or []
     opens = raw.get("opens_gap_ids") or []
@@ -63,7 +63,7 @@ def score_proposal(raw: dict[str, Any]) -> dict[str, float]:
     p1 = float(belief.get("p_after", belief.get("p_posterior", 0.5)))
 
     heur = compression_score(len(closes), len(opens))
-    blended, mdl_meta = score_with_mdl(raw, heur)
+    blended, mdl_meta = score_with_mdl(raw, heur, graph=graph)
 
     scores = {
         "compression": blended,

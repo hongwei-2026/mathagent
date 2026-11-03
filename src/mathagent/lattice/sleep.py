@@ -11,7 +11,75 @@ from mathagent.formal.json_util import extract_json
 from mathagent.lattice.graph import NodeKind, NodeStatus, ResearchGraph
 from mathagent.lattice.mdl import graph_dl
 from mathagent.lattice.prompts import SLEEP_SYSTEM
-from mathagent.lattice.value import needs_human_gate, score_proposal
+from mathagent.lattice.value import conceptual_value, needs_human_gate, score_proposal
+
+
+def admit_library_op(graph: ResearchGraph, op: dict[str, Any]) -> Any | None:
+    """Admit one library_op as a gated CONCEPT. Requires predicted_leaf_checks."""
+    stmt = str(op.get("statement", "")).strip()
+    if not stmt:
+        return None
+    leaves = op.get("predicted_leaf_checks") or []
+    if not leaves:
+        return None
+    name = str(op.get("name") or stmt[:48])
+    if any(
+        n.kind == NodeKind.CONCEPT
+        and (n.meta.get("name") == name or n.statement == stmt)
+        and n.meta.get("origin") == "sleep"
+        for n in graph.nodes.values()
+    ):
+        return None
+
+    from_lemmas = op.get("from") or []
+    prop = {
+        "name": name,
+        "statement": stmt,
+        "closes_gap_ids": op.get("closes_gap_ids") or [],
+        "opens_gap_ids": op.get("opens_gap_ids") or [],
+        "axiom_ask": op.get("axiom_ask") or [],
+        "analogies": [],
+        "belief": op.get("belief") or {"p_before": 0.35, "p_after": 0.55},
+        "predicted_leaf_checks": leaves,
+        "from": from_lemmas,
+        "compression": op.get("compression")
+        or {"lemmas_replaced": max(1, len(from_lemmas))},
+    }
+    scores = score_proposal(prop, graph=graph)
+    lr = int((prop["compression"] or {}).get("lemmas_replaced") or 0)
+    if lr:
+        scores["compression"] = max(
+            scores["compression"],
+            min(1.0, lr / (1.0 + len(prop["opens_gap_ids"]))),
+        )
+        scores["conceptual_value"] = conceptual_value(scores)
+    _ = needs_human_gate(scores, len(prop["axiom_ask"]))
+    node = graph.admit_concept(
+        stmt,
+        name=name,
+        closes_gap_ids=prop["closes_gap_ids"],
+        scores=scores,
+        human_gate=True,  # library ops always co-abduction-gated
+    )
+    node.meta["origin"] = "sleep"
+    node.meta["from_sleep"] = True
+    node.meta["library_op"] = op
+    node.meta["artifact"] = op.get("artifact") or {
+        "template": op.get("template") or "",
+        "kind": op.get("kind") or "def",
+    }
+    node.meta["from_lemmas"] = from_lemmas
+    node.meta["predicted_leaf_checks"] = leaves
+    node.meta["belief"] = prop["belief"]
+    node.meta["axiom_ask"] = prop["axiom_ask"]
+    # Provenance edges to matching lemmas
+    for src in from_lemmas:
+        s = str(src)
+        for lem in graph.by_kind(NodeKind.LEMMA):
+            if s[:40] in lem.statement or lem.statement[:40] in s:
+                graph.link(node.id, lem.id, "abstracts")
+                break
+    return node
 
 
 def sleep_consolidate(
@@ -20,8 +88,12 @@ def sleep_consolidate(
     client: OpenAI,
     settings: Settings,
     on_event: Callable[[str], None] | None = None,
-    library_learning: bool = True,
+    concept_value: bool = False,
 ) -> dict[str, Any]:
+    """
+    concept_value=False (classic): rescore next_frontier only; never inject nodes.
+    concept_value=True: admit library_ops as gated Concepts (no CONJECTURE@0.8).
+    """
     emit = on_event or (lambda _m: None)
     lemmas = [
         n.statement
@@ -30,9 +102,18 @@ def sleep_consolidate(
     ]
     blocked = [n.statement for n in graph.by_kind(NodeKind.GAP)][:12]
     if not lemmas and not blocked:
-        return {"keep_lemmas": [], "library_ops": [], "lessons": ["empty graph"], "graph_dl": graph_dl(graph)}
+        return {
+            "keep_lemmas": [],
+            "library_ops": [],
+            "lessons": ["empty graph"],
+            "graph_dl": graph_dl(graph),
+        }
 
-    emit("[lattice/sleep] library consolidating" if library_learning else "[lattice/sleep] consolidating")
+    emit(
+        "[lattice/sleep] library consolidating"
+        if concept_value
+        else "[lattice/sleep] consolidating (classic, no graph writes)"
+    )
     model = settings.model
     raw = client.chat.completions.create(
         model=model,
@@ -58,80 +139,30 @@ def sleep_consolidate(
     except Exception:
         data = {"keep_lemmas": lemmas, "library_ops": [], "abstract_lemmas": [], "lessons": []}
 
-    admitted = []
+    admitted: list[str] = []
     ops = list(data.get("library_ops") or [])
-    # Back-compat: promote old abstract_lemmas into library-shaped ops
-    for abs_lem in data.get("abstract_lemmas") or []:
-        ops.append(
-            {
-                "name": str(abs_lem.get("statement", ""))[:48],
-                "statement": abs_lem.get("statement", ""),
-                "kind": "def",
-                "why_transferable": abs_lem.get("why_transferable", ""),
-                "from": abs_lem.get("from") or [],
-                "predicted_leaf_checks": [],
-            }
-        )
 
-    if library_learning:
+    if concept_value:
         for op in ops:
-            stmt = str(op.get("statement", "")).strip()
-            if not stmt:
+            node = admit_library_op(graph, op)
+            if node is None:
+                if op.get("statement") and not (op.get("predicted_leaf_checks") or []):
+                    data.setdefault("lessons", []).append(
+                        f"[library_op refused: no leaf checks] {str(op.get('name') or op.get('statement'))[:80]}"
+                    )
                 continue
-            if any(
-                n.kind == NodeKind.CONCEPT and n.statement == stmt for n in graph.nodes.values()
-            ):
-                continue
-            prop = {
-                "name": op.get("name") or stmt[:48],
-                "statement": stmt,
-                "closes_gap_ids": op.get("closes_gap_ids") or [],
-                "opens_gap_ids": op.get("opens_gap_ids") or [],
-                "axiom_ask": op.get("axiom_ask") or [],
-                "analogies": [],
-                "belief": {"p_before": 0.35, "p_after": 0.55},
-                "predicted_leaf_checks": op.get("predicted_leaf_checks") or [],
-            }
-            scores = score_proposal(prop)
-            # Library ops always co-abduction-gated (never auto-wake as lemmas)
-            _ = needs_human_gate(scores, len(prop["axiom_ask"]))
-            node = graph.admit_concept(
-                stmt,
-                name=str(prop["name"]),
-                closes_gap_ids=prop["closes_gap_ids"],
-                scores=scores,
-                human_gate=True,
-            )
-            node.meta["from_sleep"] = True
-            node.meta["library_op"] = {
-                "kind": op.get("kind") or "def",
-                "template": op.get("template") or "",
-                "why_transferable": op.get("why_transferable") or "",
-                "from": op.get("from") or [],
-            }
-            node.meta["predicted_leaf_checks"] = prop["predicted_leaf_checks"]
-            node.meta["belief"] = prop["belief"]
-            # Never put uncertified abstractions on the wake conjecture frontier
             admitted.append(node.id)
-            emit(f"[library] {node.meta.get('name')} V={scores['conceptual_value']:.2f}")
-    else:
-        # Classic fallback: low-priority conjectures only (no 0.8 leapfrog)
-        for op in ops:
-            stmt = str(op.get("statement", "")).strip()
-            if not stmt:
-                continue
-            from mathagent.lattice.graph import Node
-
-            node = Node.new(
-                NodeKind.CONJECTURE,
-                stmt,
-                transferable=True,
-                from_sleep=True,
-                why=op.get("why_transferable", ""),
+            emit(f"[library] {node.meta.get('name')} status={node.status.value}")
+        # Deprecated abstract_lemmas: lessons only — never conjectures
+        for legacy in data.get("abstract_lemmas") or []:
+            data.setdefault("lessons", []).append(
+                f"[deprecated abstract_lemma not admitted] {str(legacy.get('statement', ''))[:120]}"
             )
-            node.score = 0.45
-            node.status = NodeStatus.OPEN
-            graph.add(node)
+    else:
+        for legacy in (data.get("abstract_lemmas") or []) + ops:
+            data.setdefault("lessons", []).append(
+                f"[classic sleep: not admitted] {str(legacy.get('statement') or legacy.get('name') or '')[:120]}"
+            )
 
     for i, stmt in enumerate(data.get("next_frontier") or []):
         for n in graph.nodes.values():

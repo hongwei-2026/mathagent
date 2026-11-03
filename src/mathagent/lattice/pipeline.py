@@ -188,12 +188,13 @@ class LatticePipeline:
                 client=self.client,
                 settings=self.settings,
                 on_event=self.on_event,
-                library_learning=True,
+                concept_value=self.concept_value,
             )
-            if self.concept_value and self.auto_accept_concepts:
-                for n in graph.by_kind(NodeKind.CONCEPT):
-                    if n.status == NodeStatus.HUMAN_REVIEW and n.meta.get("from_sleep"):
-                        n.status = NodeStatus.ACCEPTED
+            if self.concept_value:
+                if self.auto_accept_concepts:
+                    for n in graph.by_kind(NodeKind.CONCEPT):
+                        if n.status == NodeStatus.HUMAN_REVIEW and n.meta.get("origin") == "sleep":
+                            n.status = NodeStatus.ACCEPTED
                 spawned2 = spawn_leaf_conjectures_from_concepts(graph)
                 if spawned2:
                     self.on_event(f"[lattice/curator] sleep-library leaves={len(spawned2)}")
