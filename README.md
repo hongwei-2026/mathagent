@@ -42,6 +42,23 @@ User problem
 5. **Bundled samples + HF download** — start offline; scale to GSM8K/MATH when ready
 6. **CLI + Streamlit UI** — one package for scripted eval and interactive demos
 
+## Low-cost doctrine (beat “many agents × huge compute”)
+
+OpenAI-style IMO runs burn proprietary RL + massive test-time compute (often NL, no Lean).
+Open research shows a **cheaper axis** that we implement as `mathagent econ`:
+
+1. **Cheap model first** (non-CoT) — EconProver dynamic CoT  
+2. **Lean repair ×2** — Seed-Prover light (not Pass@8192)  
+3. **Decompose `have`/`sorry`** — DeepSeek-Prover / Gödel’s Poetry  
+4. **Escalate reasoner only if still open** — pay tokens only on failures  
+5. **4B-class provers can beat 671B** on miniF2F when trained right (Pythagoras) — architecture > brute force  
+
+Details: [docs/LOW_COST_PATH.md](docs/LOW_COST_PATH.md)
+
+```bash
+mathagent econ "theorem add_comm (a b : Nat) : a + b = b + a := by" --out outputs/econ.json
+```
+
 ## Formal / Fields-oriented mode (low resource)
 
 Goal: push toward **olympiad → research-shaped** problems on a laptop by copying the

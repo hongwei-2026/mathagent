@@ -158,6 +158,63 @@ def formal(
         console.print(f"Wrote {out}")
 
 
+@app.command()
+def econ(
+    problem: str = typer.Argument(..., help="Lean theorem or informal hard goal"),
+    max_tokens: int = typer.Option(12000, help="Soft token budget"),
+    max_repair: int = typer.Option(2, help="Lean repair attempts per sample"),
+    max_samples: int = typer.Option(3, help="Cheap direct samples before decompose"),
+    out: Optional[Path] = typer.Option(None, help="Write JSON result"),
+) -> None:
+    """
+    Low-cost proving path (EconProver + Seed-light + DeepSeek-Prover style).
+
+    Cheap model first → Lean repair → decompose → escalate CoT only if needed.
+    See docs/LOW_COST_PATH.md.
+    """
+    from mathagent.formal.budget import Budget
+    from mathagent.formal.econ import EconEngine
+
+    budget = Budget(
+        max_tokens=max_tokens,
+        max_repair=max_repair,
+        max_direct_samples=max_samples,
+    )
+    engine = EconEngine(budget=budget, on_event=console.print)
+    result = engine.run(problem)
+    style = "green" if result.ok else "yellow"
+    console.print(
+        Panel(
+            f"verdict={result.verdict}\nok={result.ok}\nescalated={result.escalated}\n"
+            f"calls={result.budget.used_calls if result.budget else '?'} "
+            f"tok≈{result.budget.used_tokens if result.budget else '?'}\n\n"
+            f"{result.final_code[:1200]}",
+            title="Econ result",
+            border_style=style,
+        )
+    )
+    if out:
+        payload = {
+            "problem": result.problem,
+            "ok": result.ok,
+            "verdict": result.verdict,
+            "escalated": result.escalated,
+            "final_code": result.final_code,
+            "budget": {
+                "used_calls": result.budget.used_calls if result.budget else 0,
+                "used_tokens": result.budget.used_tokens if result.budget else 0,
+                "log": result.budget.log if result.budget else [],
+            },
+            "steps": [
+                {"phase": s.phase, "ok": s.ok, "detail": s.detail, "code": s.code[:2000]}
+                for s in result.steps
+            ],
+        }
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        console.print(f"Wrote {out}")
+
+
 @app.command("lean-check")
 def lean_check_cmd(
     file: Optional[Path] = typer.Option(None, help="Lean file (default: workspace Scratch.lean)"),
